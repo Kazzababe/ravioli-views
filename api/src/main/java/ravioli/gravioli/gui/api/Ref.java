@@ -1,0 +1,23 @@
+package ravioli.gravioli.gui.api;
+
+import org.jetbrains.annotations.NotNull;
+
+public final class Ref<T> {
+    private T value;
+
+    public Ref(@NotNull final T initialValue) {
+        this.value = initialValue;
+    }
+
+    public @NotNull T get() {
+        return this.value;
+    }
+
+    public void set(@NotNull final T newValue) {
+        this.value = newValue;
+    }
+
+    public boolean isPresent() {
+        return this.value != null;
+    }
+}

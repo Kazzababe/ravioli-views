@@ -1,0 +1,8 @@
+name: ravioli-ui-examples
+main: ravioli.gravioli.gui.paper.ExamplePaperPlugin
+version: 1.0
+api-version: 1.21
+
+commands:
+  open-view:
+    description: 'Simple command to open the various example views'

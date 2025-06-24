@@ -1,0 +1,10 @@
+[versions]
+jetbrains = "26.0.2"
+paper = "1.21.1-R0.1-SNAPSHOT"
+
+[libraries]
+jetbrains-annotations = { module = "org.jetbrains:annotations", version.ref = "jetbrains" }
+
+[plugins]
+paperweight = { id = "io.papermc.paperweight.userdev", version = "2.0.0-beta.16" }
+shadow = { id = "com.gradleup.shadow", version = "9.0.0-beta12" }
