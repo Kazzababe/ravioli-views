@@ -3,9 +3,6 @@ plugins {
     alias(libs.plugins.shadow)
 }
 
-group = "ravioli.gravioli"
-version = "1.0-SNAPSHOT"
-
 repositories {
     maven("https://repo.papermc.io/repository/maven-public/")
 }

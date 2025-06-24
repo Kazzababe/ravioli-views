@@ -9,6 +9,9 @@ version = "1.0-SNAPSHOT"
 subprojects {
     apply(plugin = "java")
 
+    group = "ravioli.gravioli"
+    version = "1.0-SNAPSHOT"
+
     repositories {
         mavenCentral()
     }
