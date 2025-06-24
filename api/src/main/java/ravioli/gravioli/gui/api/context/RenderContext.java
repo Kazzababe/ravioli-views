@@ -146,6 +146,19 @@ public interface RenderContext<V, D> {
     <T> State<T> useState(@NotNull StateSupplier<T> supplier);
 
     /**
+     * Renders a child ViewComponent at the given slot. The component
+     * will be invoked with its own RenderContext for nested layout.
+     *
+     * @param slot       0-based linear slot index (row-major order)
+     * @param component child component to render
+     * @param <K>       type of props for the nested component
+     */
+    <K> void set(
+        final int slot,
+        @NotNull final ViewComponent<V, K> component
+    );
+
+    /**
      * Renders a child ViewComponent at the given grid coordinates. The component
      * will be invoked with its own RenderContext for nested layout.
      *
@@ -269,4 +282,8 @@ public interface RenderContext<V, D> {
      * May be nested; only the outer batch actually flushes.
      */
     void batch(@NotNull  Runnable work);
+
+    int getOriginX();
+
+    int getOriginY();
 }

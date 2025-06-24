@@ -18,6 +18,7 @@ import ravioli.gravioli.gui.api.context.InitContext;
 import ravioli.gravioli.gui.api.schedule.Scheduler;
 import ravioli.gravioli.gui.core.ViewReconciler;
 import ravioli.gravioli.gui.core.ViewRegistry;
+import ravioli.gravioli.gui.paper.component.container.PaperVirtualContainer;
 import ravioli.gravioli.gui.paper.schedule.PaperScheduler;
 
 import java.time.Duration;
@@ -163,8 +164,41 @@ public final class ViewManager {
     }
 
     private final class ViewListeners implements Listener {
+        private boolean isNotEditable(@NotNull final PaperSession session, final int rawSlot) {
+            return session.renderer().renderables().get(rawSlot) != PaperVirtualContainer.EditableToken.INSTANCE;
+        }
+
         @EventHandler
-        private void onClick(final InventoryClickEvent event) {
+        private void onClick(@NotNull final InventoryClickEvent event) {
+            if (!(event.getWhoClicked() instanceof final Player player)) {
+                return;
+            }
+            final PaperSession session = ViewManager.this.sessions.get(player.getUniqueId());
+
+            if (session == null) {
+                return;
+            }
+            final Inventory topInventory = event.getView().getTopInventory();
+
+            if (topInventory != session.inventory() || event.getClickedInventory() != topInventory) {
+                return;
+            }
+            final int rawSlot = event.getRawSlot();
+
+            if (this.isNotEditable(session, rawSlot)) {
+                event.setCancelled(true);
+            }
+            final ClickHandler<Player> clickHandler = session.renderer().clicks().get(rawSlot);
+
+            if (clickHandler == null) {
+                return;
+            }
+            event.setCancelled(true);
+            clickHandler.accept(new PaperClickContext(player, event));
+        }
+
+        @EventHandler
+        private void onDrag(@NotNull final InventoryDragEvent event) {
             if (!(event.getWhoClicked() instanceof final Player player)) {
                 return;
             }
@@ -178,43 +212,17 @@ public final class ViewManager {
             if (topInventory != session.inventory()) {
                 return;
             }
-            if (event.getClickedInventory() != topInventory) {
-                return;
-            }
-            final ClickHandler<Player> handler = session.renderer().clicks().get(event.getRawSlot());
-
-            event.setCancelled(true);
-
-            if (handler == null) {
-                return;
-            }
-            final var clickContext = new PaperClickContext(player, event);
-
-            handler.accept(clickContext);
-        }
-
-        @EventHandler
-        private void onDrag(final InventoryDragEvent event) {
-            if (!(event.getWhoClicked() instanceof final Player player)) {
-                return;
-            }
-            final PaperSession session = ViewManager.this.sessions.get(player.getUniqueId());
-
-            if (session == null) {
-                return;
-            }
-            final int viewSize = session.inventory().getSize();
-            final boolean touchesView = event.getRawSlots()
+            final boolean touchesBlockedSlot = event.getRawSlots()
                 .stream()
-                .anyMatch((slot) -> slot < viewSize);
+                .anyMatch((slot) -> this.isNotEditable(session, slot));
 
-            if (touchesView) {
+            if (touchesBlockedSlot) {
                 event.setCancelled(true);
             }
         }
 
         @EventHandler
-        private void onClose(final InventoryCloseEvent event) {
+        private void onClose(@NotNull final InventoryCloseEvent event) {
             final PaperSession session = ViewManager.this.sessions.remove(event.getPlayer().getUniqueId());
 
             if (session == null) {
@@ -224,7 +232,7 @@ public final class ViewManager {
         }
 
         @EventHandler
-        private void onQuit(final PlayerQuitEvent event) {
+        private void onPlayerQuit(@NotNull final PlayerQuitEvent event) {
             final PaperSession session = ViewManager.this.sessions.remove(event.getPlayer().getUniqueId());
 
             if (session == null) {

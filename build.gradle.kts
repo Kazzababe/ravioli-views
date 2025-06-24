@@ -7,7 +7,7 @@ allprojects {
     apply(plugin = "java")
 
     group = "ravioli.gravioli"
-    version = "1.0-SNAPSHOT"
+    version = "0.9.0"
 
     repositories {
         mavenCentral()

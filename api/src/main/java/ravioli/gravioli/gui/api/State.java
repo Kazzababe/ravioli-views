@@ -22,6 +22,7 @@ public final class State<T> {
             return;
         }
         this.value = newValue;
+
         this.changeListener.accept(null);
     }
 

@@ -9,6 +9,7 @@ import org.jetbrains.annotations.NotNull;
 import ravioli.gravioli.gui.paper.ViewManager;
 import ravioli.gravioli.gui.paper.view.PaperView;
 import ravioli.gravioli.gui.paper.view.SimpleCounterView;
+import ravioli.gravioli.gui.paper.view.VirtualInventoryView;
 
 import java.util.Arrays;
 import java.util.List;
@@ -69,7 +70,8 @@ public final class OpenViewCommand implements CommandExecutor, TabCompleter {
     }
 
     public enum Views {
-        COUNTER(SimpleCounterView.class);
+        COUNTER(SimpleCounterView.class),
+        VIRTUAL_INVENTORY(VirtualInventoryView.class);
 
         private final Class<? extends PaperView<?>> viewClass;
 

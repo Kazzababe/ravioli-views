@@ -1,5 +1,6 @@
 package ravioli.gravioli.gui.core;
 
+import org.bukkit.Bukkit;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import ravioli.gravioli.gui.api.ClickHandler;
@@ -101,7 +102,7 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
 
         CompletableFuture
             .supplyAsync(defaultValueSupplier)
-            .thenAccept(ref::set);
+            .thenAcceptAsync(ref::set, this.scheduler::run);
 
         return ref;
     }
@@ -112,7 +113,7 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
 
         CompletableFuture
             .supplyAsync(defaultValueSupplier, executor)
-            .thenAccept(ref::set);
+            .thenAcceptAsync(ref::set, this.scheduler::run);
 
         return ref;
     }
@@ -133,7 +134,7 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
 
         CompletableFuture
             .supplyAsync(defaultValueSupplier)
-            .thenAccept(state::set);
+            .thenAcceptAsync(state::set, this.scheduler::run);
 
         return state;
     }
@@ -144,7 +145,7 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
 
         CompletableFuture
             .supplyAsync(defaultValueSupplier, executor)
-            .thenAccept(state::set);
+            .thenAcceptAsync(state::set, this.scheduler::run);
 
         return state;
     }
@@ -159,6 +160,14 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
         return this.getState(defaultValueSupplier);
     }
 
+    private void enqueueUpdate(@NotNull final Runnable task) {
+        if (Bukkit.isPrimaryThread()) {
+            task.run();
+        } else {
+            this.scheduler.run(task);
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private <T> State<T> getState(final StateSupplier<T> valueSupplier) {
         final List<State<?>> bucket = this.stateMap.computeIfAbsent(
@@ -167,15 +176,13 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
         );
 
         if (this.stateCursor >= bucket.size()) {
-            bucket.add(new State<>(valueSupplier.get(), (ignored) -> {
-                this.scheduler.run(() -> {
-                    if (this.batchDepth > 0) {
-                        this.dirtyBatch = true;
-                    } else {
-                        this.schedule.run();
-                    }
-                });
-            }));
+            bucket.add(new State<>(valueSupplier.get(), (ignored) -> this.enqueueUpdate(() -> {
+                if (this.batchDepth > 0) {
+                    this.dirtyBatch = true;
+                } else {
+                    this.schedule.run();
+                }
+            })));
         }
         return (State<T>) bucket.get(this.stateCursor++);
     }
@@ -190,7 +197,18 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
     }
 
     private int rootSlot(final int x, final int y) {
+        if (x >= WIDTH) {
+            return -1;
+        }
         return y * WIDTH + x;
+    }
+
+    @Override
+    public <K> void set(final int slot, final @NotNull ViewComponent<V, K> component) {
+        final int localX = slot % WIDTH;
+        final int localY = slot / WIDTH;
+
+        this.set(localX, localY, component);
     }
 
     @Override
@@ -220,13 +238,21 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
 
     @Override
     public void set(final int x, final int y, @NotNull final ViewRenderable renderable) {
-        this.renderables.put(this.rootSlot(x, y), renderable);
+        final int rootSlot = this.rootSlot(x, y);
+
+        if (rootSlot == -1) {
+            return;
+        }
+        this.renderables.put(rootSlot, renderable);
     }
 
     @Override
     public void set(final int x, final int y, @NotNull final ViewRenderable r, @NotNull final ClickHandler<V> clickHandler) {
         final int slot = this.rootSlot(x, y);
 
+        if (slot == -1) {
+            return;
+        }
         this.renderables.put(slot, r);
         this.clicks.put(slot, clickHandler);
     }
@@ -245,20 +271,28 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
     @Override
     public void batch(@NotNull final Runnable work) {
         // Batches should be interacted with on the main thread
-        this.scheduler.run(() -> {
-            this.batchDepth++;
+        this.batchDepth++;
 
-            try {
-                work.run();
-            } finally {
-                this.batchDepth--;
+        try {
+            work.run();
+        } finally {
+            this.batchDepth--;
 
-                if (this.batchDepth == 0 && this.dirtyBatch) {
-                    this.dirtyBatch = false;
-                    this.scheduler.run(this.schedule);
-                }
+            if (this.batchDepth == 0 && this.dirtyBatch) {
+                this.dirtyBatch = false;
+                this.scheduler.run(this.schedule);
             }
-        });
+        }
+    }
+
+    @Override
+    public int getOriginX() {
+        return 0;
+    }
+
+    @Override
+    public int getOriginY() {
+        return 0;
     }
 
     private class ChildContext<K> implements RenderContext<V, K> {
@@ -301,7 +335,13 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
             if (!this.inBounds(localX, localY)) {
                 return -1;
             }
-            return RootRenderContext.this.rootSlot(this.mapX(localX), this.mapY(localY));
+            final int rootX = this.mapX(localX);
+            final int rootY = this.mapY(localY);
+
+            if (rootX < 0 || rootX >= WIDTH) {
+                return -1;
+            }
+            return RootRenderContext.this.rootSlot(rootX, rootY);
         }
 
         private void renderComponent(final ViewComponent<V, K> component) {
@@ -364,6 +404,15 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
         }
 
         @Override
+        public <L> void set(final int slot, final @NotNull ViewComponent<V, L> component) {
+            final int mappedSlot = this.mapSlot(slot);
+
+            if (mappedSlot != -1) {
+                RootRenderContext.this.set(mappedSlot, component);
+            }
+        }
+
+        @Override
         public <L> void set(final int x, final int y, @NotNull final ViewComponent<V, L> component, @Nullable final L props) {
             if (this.inBounds(x, y)) {
                 RootRenderContext.this.set(this.mapX(x), this.mapY(y), component, props);
@@ -405,6 +454,16 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
         @Override
         public void batch(@NotNull final Runnable work) {
             RootRenderContext.this.batch(work);
+        }
+
+        @Override
+        public int getOriginX() {
+            return this.originX;
+        }
+
+        @Override
+        public int getOriginY() {
+            return this.originY;
         }
     }
 }

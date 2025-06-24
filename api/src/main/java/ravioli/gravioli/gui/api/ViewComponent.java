@@ -11,7 +11,7 @@ import ravioli.gravioli.gui.api.context.RenderContext;
  * @param <V> type of the viewer (e.g., a player or UI client)
  * @param <D> type of optional props supplied when rendering this component
  */
-public abstract class ViewComponent<V, D> implements ViewRenderable {
+public abstract class ViewComponent<V, D> {
     /**
      * Defines how this component produces its content each render cycle.
      * Use {@link RenderContext} to read state, props, viewer, and to place
