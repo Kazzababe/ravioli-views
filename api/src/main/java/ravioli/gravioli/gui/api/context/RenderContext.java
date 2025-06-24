@@ -261,4 +261,12 @@ public interface RenderContext<V, D> {
     ) {
         this.set(slot, renderable, (context) -> clickHandler.run());
     }
+
+    /**
+     * Runs {@code work} in a batching scope. All State/Ref mutations executed
+     * inside the scope are coalesced — only one render is triggered when the
+     * outer-most batch completes.
+     * May be nested; only the outer batch actually flushes.
+     */
+    void batch(@NotNull  Runnable work);
 }

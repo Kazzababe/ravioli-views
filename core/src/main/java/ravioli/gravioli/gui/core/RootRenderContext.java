@@ -41,7 +41,9 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
     private final Map<String, Integer> overlayCounters = new HashMap<>();
 
     private int stateCursor = 0;
-    private int refCursor   = 0;
+    private int refCursor = 0;
+    private int batchDepth = 0;
+    private boolean dirtyBatch = false;
 
     RootRenderContext(
         @Nullable final D props,
@@ -165,8 +167,15 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
         );
 
         if (this.stateCursor >= bucket.size()) {
-            // Update function remains a consumer due to future API uncertainty
-            bucket.add(new State<>(valueSupplier.get(), (ignored) -> this.schedule.run()));
+            bucket.add(new State<>(valueSupplier.get(), (ignored) -> {
+                this.scheduler.run(() -> {
+                    if (this.batchDepth > 0) {
+                        this.dirtyBatch = true;
+                    } else {
+                        this.schedule.run();
+                    }
+                });
+            }));
         }
         return (State<T>) bucket.get(this.stateCursor++);
     }
@@ -231,6 +240,25 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
     public void set(final int slot, @NotNull final ViewRenderable renderable, @NotNull final ClickHandler<V> clickHandler) {
         this.renderables.put(slot, renderable);
         this.clicks.put(slot, clickHandler);
+    }
+
+    @Override
+    public void batch(@NotNull final Runnable work) {
+        // Batches should be interacted with on the main thread
+        this.scheduler.run(() -> {
+            this.batchDepth++;
+
+            try {
+                work.run();
+            } finally {
+                this.batchDepth--;
+
+                if (this.batchDepth == 0 && this.dirtyBatch) {
+                    this.dirtyBatch = false;
+                    this.scheduler.run(this.schedule);
+                }
+            }
+        });
     }
 
     private class ChildContext<K> implements RenderContext<V, K> {
@@ -372,6 +400,11 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
             if (root != -1) {
                 RootRenderContext.this.set(root, renderable, clickHandler);
             }
+        }
+
+        @Override
+        public void batch(@NotNull final Runnable work) {
+            RootRenderContext.this.batch(work);
         }
     }
 }

@@ -5,7 +5,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.function.Consumer;
 
 public final class State<T> {
-    private T value;
+    private volatile T value;
     private final Consumer<Void> changeListener;
 
     public State(@NotNull final T initialValue, @NotNull final Consumer<Void> changeListener) {
@@ -27,5 +27,9 @@ public final class State<T> {
 
     public boolean isPresent() {
         return this.value != null;
+    }
+
+    public boolean isEmpty() {
+        return this.value == null;
     }
 }

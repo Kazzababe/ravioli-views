@@ -21,9 +21,9 @@ public final class PaperScheduler implements Scheduler {
 
     @Override
     public @NotNull TaskHandle run(@NotNull final Runnable task) {
-        final BukkitTask bukkitTask = Bukkit.getScheduler().runTask(this.plugin, task);
+        Bukkit.getScheduler().getMainThreadExecutor(this.plugin).execute(task);
 
-        return bukkitTask::cancel;
+        return () -> {}; // Executed immediately, not cancellable
     }
 
     @Override

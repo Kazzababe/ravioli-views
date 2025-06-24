@@ -178,12 +178,12 @@ public final class ViewManager {
             if (topInventory != session.inventory()) {
                 return;
             }
-            event.setCancelled(true);
-
             if (event.getClickedInventory() != topInventory) {
                 return;
             }
             final ClickHandler<Player> handler = session.renderer().clicks().get(event.getRawSlot());
+
+            event.setCancelled(true);
 
             if (handler == null) {
                 return;

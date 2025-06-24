@@ -3,7 +3,7 @@ package ravioli.gravioli.gui.api;
 import org.jetbrains.annotations.NotNull;
 
 public final class Ref<T> {
-    private T value;
+    private volatile T value;
 
     public Ref(@NotNull final T initialValue) {
         this.value = initialValue;
@@ -19,5 +19,9 @@ public final class Ref<T> {
 
     public boolean isPresent() {
         return this.value != null;
+    }
+
+    public boolean isEmpty() {
+        return this.value == null;
     }
 }
