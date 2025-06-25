@@ -5,9 +5,9 @@ import org.bukkit.inventory.InventoryHolder;
 import org.jetbrains.annotations.NotNull;
 
 final class ViewInventoryHolder implements InventoryHolder {
-    private PaperSession session;
+    private ViewSession<?> session;
 
-    void setSession(@NotNull final PaperSession session) {
+    void setSession(@NotNull final ViewSession<?> session) {
         this.session = session;
     }
 

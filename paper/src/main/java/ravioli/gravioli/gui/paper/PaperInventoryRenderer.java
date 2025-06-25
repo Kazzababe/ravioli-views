@@ -9,13 +9,15 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
-import ravioli.gravioli.gui.api.ClickHandler;
-import ravioli.gravioli.gui.api.Patch;
-import ravioli.gravioli.gui.api.View;
-import ravioli.gravioli.gui.api.ViewRenderable;
-import ravioli.gravioli.gui.api.ViewSession;
+import org.jetbrains.annotations.Nullable;
+import ravioli.gravioli.gui.api.interaction.ClickHandler;
+import ravioli.gravioli.gui.api.reconciliation.Patch;
+import ravioli.gravioli.gui.api.render.ViewRenderable;
+import ravioli.gravioli.gui.api.session.IViewSession;
 import ravioli.gravioli.gui.core.AbstractInventoryRenderer;
-import ravioli.gravioli.gui.paper.component.container.PaperVirtualContainer;
+import ravioli.gravioli.gui.paper.component.container.VirtualContainerViewComponent;
+import ravioli.gravioli.gui.paper.context.ClickContext;
+import ravioli.gravioli.gui.paper.view.View;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -23,23 +25,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-public final class PaperInventoryRenderer extends AbstractInventoryRenderer<Player, ItemStack> {
+public final class PaperInventoryRenderer<D> extends AbstractInventoryRenderer<Player, D, ItemStack, View<D>> {
     private static final NamespacedKey VIEW_ITEM_KEY = new NamespacedKey("ravioli-views", "view-item");
 
     private final Plugin plugin;
 
     private final Map<Integer, ViewRenderable> renderables = new HashMap<>();
-    private final Map<Integer, ClickHandler<Player>> clickMap = new HashMap<>();
+    private final Map<Integer, ClickHandler<Player, ClickContext>> clickMap = new HashMap<>();
 
-    private PaperSession session;
+    private ViewSession<D> session;
 
     PaperInventoryRenderer(@NotNull final Plugin plugin) {
         this.plugin = plugin;
     }
 
     @Override
-    public @NotNull PaperSession mount(
-        @NotNull final View<Player, ?> rootView,
+    public @NotNull ViewSession<D> mount(
+        @NotNull final View<D> rootView,
+        @Nullable final D props,
         @NotNull final Player viewer,
         @NotNull final Object title,
         final int size
@@ -51,7 +54,7 @@ public final class PaperInventoryRenderer extends AbstractInventoryRenderer<Play
                 ? component
                 : Component.text(title.toString()));
 
-        this.session = new PaperSession(rootView, viewer, inventory, this);
+        this.session = new ViewSession<>(rootView, props, viewer, inventory, this);
 
         ((ViewInventoryHolder) inventory.getHolder()).setSession(this.session);
         viewer.openInventory(inventory);
@@ -60,7 +63,7 @@ public final class PaperInventoryRenderer extends AbstractInventoryRenderer<Play
     }
 
     @Override
-    public void unmount(@NotNull final ViewSession<Player> session) {
+    public void unmount(@NotNull final IViewSession<Player, D> session) {
         super.unmount(session);
 
         this.session.getViewer().closeInventory();
@@ -107,25 +110,25 @@ public final class PaperInventoryRenderer extends AbstractInventoryRenderer<Play
 
         for (final Patch.Diff diff : patch.diffs()) {
             if (
-                diff instanceof Patch.Set(final int slot, final ViewRenderable renderable, final ClickHandler<?> click)
-                    && renderable == PaperVirtualContainer.EditableToken.INSTANCE
+                diff instanceof Patch.Set(final int slot, final ViewRenderable renderable, final ClickHandler<?, ?> click)
+                    && renderable == VirtualContainerViewComponent.EditableToken.INSTANCE
             ) {
                 if (click != null) {
-                    this.clickMap.put(slot, (ClickHandler<Player>) click);
+                    this.clickMap.put(slot, (ClickHandler<Player, ClickContext>) click);
                 } else {
                     this.clickMap.remove(slot);
                 }
-                this.renderables.put(slot, PaperVirtualContainer.EditableToken.INSTANCE);
+                this.renderables.put(slot, VirtualContainerViewComponent.EditableToken.INSTANCE);
 
                 continue;
             }
             if (diff instanceof Patch.Set(
-                final int slot, final ViewRenderable renderable, final ClickHandler<?> click
+                final int slot, final ViewRenderable renderable, final ClickHandler<?, ?> click
             )) {
                 this.renderables.put(slot, renderable);
 
                 if (click != null) {
-                    this.clickMap.put(slot, (ClickHandler<Player>) click);
+                    this.clickMap.put(slot, (ClickHandler<Player, ClickContext>) click);
                 } else {
                     this.clickMap.remove(slot);
                 }
@@ -142,7 +145,7 @@ public final class PaperInventoryRenderer extends AbstractInventoryRenderer<Play
         super.apply(new Patch(normal));
     }
 
-    @NotNull Map<Integer, ClickHandler<Player>> clicks() {
+    @NotNull Map<Integer, ClickHandler<Player, ClickContext>> clicks() {
         return this.clickMap;
     }
 

@@ -2,16 +2,17 @@ package ravioli.gravioli.gui.core;
 
 import org.jetbrains.annotations.MustBeInvokedByOverriders;
 import org.jetbrains.annotations.NotNull;
-import ravioli.gravioli.gui.api.Patch;
-import ravioli.gravioli.gui.api.Renderer;
-import ravioli.gravioli.gui.api.ViewRenderable;
-import ravioli.gravioli.gui.api.ViewSession;
+import ravioli.gravioli.gui.api.IView;
+import ravioli.gravioli.gui.api.reconciliation.Patch;
+import ravioli.gravioli.gui.api.render.Renderer;
+import ravioli.gravioli.gui.api.render.ViewRenderable;
 import ravioli.gravioli.gui.api.schedule.Scheduler;
+import ravioli.gravioli.gui.api.session.IViewSession;
 
-public abstract class AbstractInventoryRenderer<V, D> implements Renderer<V> {
+public abstract class AbstractInventoryRenderer<V, D, K, V2 extends IView<V, D, ?, ?, ?, ?>> implements Renderer<V, D, V2> {
     @Override
     @MustBeInvokedByOverriders
-    public void unmount(@NotNull final ViewSession<V> session) {
+    public void unmount(@NotNull final IViewSession<V, D> session) {
         session.getSchedulerTasks().forEach(Scheduler.TaskHandle::cancel);
     }
 
@@ -20,7 +21,7 @@ public abstract class AbstractInventoryRenderer<V, D> implements Renderer<V> {
     public void apply(@NotNull final Patch patch) {
         for (final Patch.Diff diff : patch.diffs()) {
             if (diff instanceof final Patch.Set set) {
-                final D item = this.toPlatformItem(set.renderable());
+                final K item = this.toPlatformItem(set.renderable());
 
                 this.setItem(set.slot(), item);
             } else if (diff instanceof Patch.Clear(final int slot)) {
@@ -29,9 +30,9 @@ public abstract class AbstractInventoryRenderer<V, D> implements Renderer<V> {
         }
     }
 
-    protected abstract void setItem(int slot, @NotNull D item);
+    protected abstract void setItem(int slot, @NotNull K item);
 
     protected abstract void clearItem(int slot);
 
-    protected abstract @NotNull D toPlatformItem(@NotNull ViewRenderable renderable);
+    protected abstract @NotNull K toPlatformItem(@NotNull ViewRenderable renderable);
 }

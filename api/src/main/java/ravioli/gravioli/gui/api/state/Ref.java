@@ -1,4 +1,4 @@
-package ravioli.gravioli.gui.api;
+package ravioli.gravioli.gui.api.state;
 
 import org.jetbrains.annotations.NotNull;
 

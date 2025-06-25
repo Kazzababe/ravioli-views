@@ -9,7 +9,7 @@ import org.jetbrains.annotations.Nullable;
  * @param <V> type of the viewer
  * @param <D> type of the optional properties passed into the view
  */
-public interface InitContext<V, D> {
+public interface IInitContext<V, D> {
     /**
      * Returns the entity or object that will view this GUI (e.g., a Player).
      *
@@ -39,13 +39,4 @@ public interface InitContext<V, D> {
      * @param title the title component string; must not be null
      */
     void title(@NotNull String title);
-
-    /**
-     * Alternative title setter accepting any object whose {@code toString()}
-     * will be used as the view title.
-     * Must be called during init; ignored during render.
-     *
-     * @param title the title object; must not be null
-     */
-    void title(@NotNull Object title);
 }

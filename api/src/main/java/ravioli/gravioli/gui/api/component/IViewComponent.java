@@ -1,8 +1,8 @@
-package ravioli.gravioli.gui.api;
+package ravioli.gravioli.gui.api.component;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import ravioli.gravioli.gui.api.context.RenderContext;
+import ravioli.gravioli.gui.api.context.IRenderContext;
 
 /**
  * A reusable building block within a View, capable of rendering nested components
@@ -11,15 +11,15 @@ import ravioli.gravioli.gui.api.context.RenderContext;
  * @param <V> type of the viewer (e.g., a player or UI client)
  * @param <D> type of optional props supplied when rendering this component
  */
-public abstract class ViewComponent<V, D> {
+public abstract class IViewComponent<V, D, RC extends IRenderContext<V, D, ?>> {
     /**
      * Defines how this component produces its content each render cycle.
-     * Use {@link RenderContext} to read state, props, viewer, and to place
+     * Use {@link IRenderContext} to read state, props, viewer, and to place
      * child components or static renderables into slots.
      *
      * @param context rendering context scoped to this component
      */
-    public abstract void render(@NotNull final RenderContext<V, D> context);
+    public abstract void render(@NotNull RC context);
 
     /**
      * Returns the width of this component in grid cells. Defaults to 1.

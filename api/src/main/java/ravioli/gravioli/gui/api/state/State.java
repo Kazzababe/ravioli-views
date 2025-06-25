@@ -1,7 +1,8 @@
-package ravioli.gravioli.gui.api;
+package ravioli.gravioli.gui.api.state;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Objects;
 import java.util.function.Consumer;
 
 public final class State<T> {
@@ -18,7 +19,7 @@ public final class State<T> {
     }
 
     public void set(@NotNull final T newValue) {
-        if (newValue.equals(this.value)) {
+        if (Objects.equals(newValue, this.value)) {
             return;
         }
         this.value = newValue;

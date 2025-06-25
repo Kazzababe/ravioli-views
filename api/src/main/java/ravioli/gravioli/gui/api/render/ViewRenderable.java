@@ -1,4 +1,4 @@
-package ravioli.gravioli.gui.api;
+package ravioli.gravioli.gui.api.render;
 
 /**
  * Marker interface for elements that can be rendered into a slot.

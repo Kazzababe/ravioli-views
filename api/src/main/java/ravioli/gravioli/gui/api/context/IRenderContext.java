@@ -2,14 +2,17 @@ package ravioli.gravioli.gui.api.context;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import ravioli.gravioli.gui.api.ClickHandler;
-import ravioli.gravioli.gui.api.Ref;
-import ravioli.gravioli.gui.api.State;
-import ravioli.gravioli.gui.api.StateSupplier;
-import ravioli.gravioli.gui.api.ViewComponent;
-import ravioli.gravioli.gui.api.ViewRenderable;
+import ravioli.gravioli.gui.api.component.IViewComponent;
+import ravioli.gravioli.gui.api.interaction.ClickHandler;
+import ravioli.gravioli.gui.api.render.ViewRenderable;
 import ravioli.gravioli.gui.api.schedule.Scheduler;
+import ravioli.gravioli.gui.api.state.Ref;
+import ravioli.gravioli.gui.api.state.State;
+import ravioli.gravioli.gui.api.state.StateSupplier;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
@@ -19,7 +22,19 @@ import java.util.function.Supplier;
  * @param <V> type of the viewer (e.g., player, user client, etc.)
  * @param <D> type of the optional properties passed from InitContext
  */
-public interface RenderContext<V, D> {
+public interface IRenderContext<V, D, C extends IClickContext<V>> {
+    @FunctionalInterface
+    interface RenderContextCreator<V, D, CC extends IClickContext<V>, C extends IRenderContext<V, D, CC>> {
+        @NotNull C create(
+            @NotNull Map<Integer, ViewRenderable> renderables,
+            @NotNull Map<Integer, ClickHandler<V, CC>> clicks,
+            @NotNull Map<String, List<State<?>>> stateMap,
+            @NotNull Map<String, List<Ref<?>>> refMap,
+            @NotNull Set<String> visited,
+            @NotNull Runnable requestUpdateFn
+        );
+    }
+
     /**
      * Returns the viewer associated with this render invocation.
      *
@@ -155,7 +170,7 @@ public interface RenderContext<V, D> {
      */
     <K> void set(
         final int slot,
-        @NotNull final ViewComponent<V, K> component
+        @NotNull final IViewComponent<V, K, ?> component
     );
 
     /**
@@ -170,7 +185,7 @@ public interface RenderContext<V, D> {
     default <K> void set(
         final int x,
         final int y,
-        @NotNull final ViewComponent<V, K> component
+        @NotNull final IViewComponent<V, K, ?> component
     ) {
         this.set(x, y, component, (K) null);
     }
@@ -187,7 +202,7 @@ public interface RenderContext<V, D> {
     <K> void set(
         final int x,
         final int y,
-        @NotNull final ViewComponent<V, K> component,
+        @NotNull final IViewComponent<V, K, ?> component,
         @Nullable final K props
     );
 
@@ -216,7 +231,7 @@ public interface RenderContext<V, D> {
         final int x,
         final int y,
         @NotNull final ViewRenderable renderable,
-        @NotNull final ClickHandler<V> clickHandler
+        @NotNull final ClickHandler<V, C> clickHandler
     );
 
     /**
@@ -233,7 +248,7 @@ public interface RenderContext<V, D> {
         @NotNull final ViewRenderable renderable,
         @NotNull final Runnable clickHandler
     ) {
-        this.set(x, y, renderable, clickHandler);
+        this.set(x, y, renderable, (clickContext) -> clickHandler.run());
     }
 
     /**
@@ -257,7 +272,7 @@ public interface RenderContext<V, D> {
     void set(
         final int slot,
         @NotNull final ViewRenderable renderable,
-        @NotNull final ClickHandler<V> clickHandler
+        @NotNull final ClickHandler<V, C> clickHandler
     );
 
     /**

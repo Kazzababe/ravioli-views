@@ -1,11 +1,12 @@
 package ravioli.gravioli.gui.core.component;
 
 import org.jetbrains.annotations.NotNull;
-import ravioli.gravioli.gui.api.Ref;
-import ravioli.gravioli.gui.api.State;
-import ravioli.gravioli.gui.api.ViewComponent;
-import ravioli.gravioli.gui.api.ViewRenderable;
-import ravioli.gravioli.gui.api.context.RenderContext;
+import ravioli.gravioli.gui.api.component.IViewComponent;
+import ravioli.gravioli.gui.api.context.IClickContext;
+import ravioli.gravioli.gui.api.context.IRenderContext;
+import ravioli.gravioli.gui.api.render.ViewRenderable;
+import ravioli.gravioli.gui.api.state.Ref;
+import ravioli.gravioli.gui.api.state.State;
 
 import java.util.Collections;
 import java.util.List;
@@ -22,7 +23,7 @@ import java.util.function.Function;
  * @param <V> viewer type
  * @param <T> item model type
  */
-public final class PaginatedContainer<V, T> extends ViewComponent<V, Void> {
+public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, RC extends IRenderContext<V, Void, CC>> extends IViewComponent<V, Void, RC> {
     public interface Handle {
         void next();
 
@@ -55,7 +56,7 @@ public final class PaginatedContainer<V, T> extends ViewComponent<V, Void> {
      * @param renderer  maps T -> ViewRenderable
      * @param handleRef a Ref that will be populated with the Handle
      */
-    public PaginatedContainer(
+    public PaginatedContainerViewComponent(
         final int width,
         final int height,
         @NotNull final BiConsumer<Integer /*page*/, BiConsumer<List<T>, Integer /*total*/>> loader,
@@ -80,7 +81,7 @@ public final class PaginatedContainer<V, T> extends ViewComponent<V, Void> {
     }
 
     @Override
-    public void render(@NotNull final RenderContext<V, Void> context) {
+    public void render(@NotNull final RC context) {
         final State<Integer> page = context.useState(0);
         final State<List<T>> items = context.useState(Collections.emptyList());
         final State<Integer> pages = context.useState(-1);
@@ -90,17 +91,17 @@ public final class PaginatedContainer<V, T> extends ViewComponent<V, Void> {
             this.handleRef.set(new Handle() {
                 @Override
                 public void next() {
-                    PaginatedContainer.this.changePage(page, pages, page.get() + 1);
+                    PaginatedContainerViewComponent.this.changePage(page, pages, page.get() + 1);
                 }
 
                 @Override
                 public void previous() {
-                    PaginatedContainer.this.changePage(page, pages, page.get() - 1);
+                    PaginatedContainerViewComponent.this.changePage(page, pages, page.get() - 1);
                 }
 
                 @Override
                 public void gotoPage(final int newPage) {
-                    PaginatedContainer.this.changePage(page, pages, newPage);
+                    PaginatedContainerViewComponent.this.changePage(page, pages, newPage);
                 }
 
                 @Override
@@ -154,7 +155,7 @@ public final class PaginatedContainer<V, T> extends ViewComponent<V, Void> {
         page.set(target);
     }
 
-    public static <V, T> PaginatedContainer<V, T> sync(
+    public static <V, T, CC extends IClickContext<V>, RC extends IRenderContext<V, Void, CC>> PaginatedContainerViewComponent<V, T, CC, RC> sync(
         final int width,
         final int height,
         @NotNull final List<T> fullList,
@@ -173,10 +174,10 @@ public final class PaginatedContainer<V, T> extends ViewComponent<V, Void> {
             );
         };
 
-        return new PaginatedContainer<>(width, height, loader, renderer, handle);
+        return new PaginatedContainerViewComponent<>(width, height, loader, renderer, handle);
     }
 
-    public static <V, T> PaginatedContainer<V, T> async(
+    public static <V, T, CC extends IClickContext<V>, RC extends IRenderContext<V, Void, CC>> PaginatedContainerViewComponent<V, T, CC, RC> async(
         final int width,
         final int height,
         @NotNull final Function<Integer /*page*/, CompletableFuture<List<T>>> asyncLoader,
@@ -189,6 +190,6 @@ public final class PaginatedContainer<V, T> extends ViewComponent<V, Void> {
                 .apply(page)
                 .thenAccept((list) -> callback.accept(list, totalPagesSupplier.apply(page)));
 
-        return new PaginatedContainer<>(width, height, loader, renderer, handle);
+        return new PaginatedContainerViewComponent<>(width, height, loader, renderer, handle);
     }
 }

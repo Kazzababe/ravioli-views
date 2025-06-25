@@ -2,10 +2,11 @@ package ravioli.gravioli.gui.core.component;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import ravioli.gravioli.gui.api.ClickHandler;
-import ravioli.gravioli.gui.api.ViewComponent;
-import ravioli.gravioli.gui.api.ViewRenderable;
-import ravioli.gravioli.gui.api.context.RenderContext;
+import ravioli.gravioli.gui.api.component.IViewComponent;
+import ravioli.gravioli.gui.api.context.IClickContext;
+import ravioli.gravioli.gui.api.context.IRenderContext;
+import ravioli.gravioli.gui.api.interaction.ClickHandler;
+import ravioli.gravioli.gui.api.render.ViewRenderable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,7 +17,7 @@ import java.util.Map;
  * A container that paints its children from a character-mask.
  *
  * <pre>
- * new LayoutContainer&lt;&gt;(
+ * new LayoutContainerViewComponent&lt;&gt;(
  *     " AAAAA ",
  *     " B   B ",
  *     " B   B ",
@@ -31,27 +32,27 @@ import java.util.Map;
  *
  * @param <V> viewer type (e.g., Player)
  */
-public final class LayoutContainer<V> extends ViewComponent<V, Void> {
-    public interface SlotBuilder<V> {
-        @NotNull SlotBuilder<V> item(@NotNull ViewRenderable renderable);
+public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC extends IRenderContext<V, Void, CC>, S extends LayoutContainerViewComponent<V, CC, RC, S>> extends IViewComponent<V, Void, RC> {
+    public interface SlotBuilder<V, C extends IClickContext<V>> {
+        @NotNull SlotBuilder<V, C> item(@NotNull ViewRenderable renderable);
 
-        @NotNull SlotBuilder<V> onClick(@Nullable ClickHandler<V> clickHandler);
+        @NotNull SlotBuilder<V, C> onClick(@Nullable ClickHandler<V, C> clickHandler);
     }
 
     @FunctionalInterface
-    public interface SlotConfigurer<V> {
+    public interface SlotConfigurer<V, C extends IClickContext<V>> {
         void configure(
             int index,
             int x,
             int y,
-            @NotNull SlotBuilder<V> builder
+            @NotNull SlotBuilder<V, C> builder
         );
     }
 
     private final String[] mask;
-    private final Map<Character, List<SlotConfigurer<V>>> configurers = new HashMap<>();
+    private final Map<Character, List<SlotConfigurer<V, CC>>> configurers = new HashMap<>();
 
-    public LayoutContainer(@NotNull final String... mask) {
+    public LayoutContainerViewComponent(@NotNull final String... mask) {
         if (mask.length == 0) {
             throw new IllegalArgumentException("mask must contain rows");
         }
@@ -65,14 +66,14 @@ public final class LayoutContainer<V> extends ViewComponent<V, Void> {
         this.mask = mask.clone();
     }
 
-    public LayoutContainer<V> map(final char ch, @NotNull final ViewRenderable renderable) {
+    public final S map(final char ch, @NotNull final ViewRenderable renderable) {
         return this.map(ch, (i, x, y, builder) -> builder.item(renderable));
     }
 
-    public LayoutContainer<V> map(
+    public final S map(
         final char ch,
         @NotNull final ViewRenderable renderable,
-        @NotNull final ClickHandler<V> click
+        @NotNull final ClickHandler<V, CC> click
     ) {
         return this.map(ch, (i, x, y, builder) ->
             builder.item(renderable)
@@ -80,7 +81,7 @@ public final class LayoutContainer<V> extends ViewComponent<V, Void> {
         );
     }
 
-    public LayoutContainer<V> map(
+    public final S map(
         final char ch,
         @NotNull final ViewRenderable renderable,
         @NotNull final Runnable click
@@ -91,17 +92,18 @@ public final class LayoutContainer<V> extends ViewComponent<V, Void> {
         );
     }
 
-    public LayoutContainer<V> map(
+    @SuppressWarnings("unchecked")
+    public final S map(
         final char ch,
-        @NotNull final SlotConfigurer<V> configurer
+        @NotNull final SlotConfigurer<V, CC> configurer
     ) {
         this.configurers.computeIfAbsent(ch, (key) -> new ArrayList<>()).add(configurer);
 
-        return this;
+        return (S) this;
     }
 
     @Override
-    public void render(@NotNull final RenderContext<V, Void> context) {
+    public void render(@NotNull final RC context) {
         final Map<Character, Integer> counters = new HashMap<>();
 
         for (int y = 0; y < this.mask.length; y++) {
@@ -109,14 +111,14 @@ public final class LayoutContainer<V> extends ViewComponent<V, Void> {
 
             for (int x = 0; x < row.length(); x++) {
                 final char ch = row.charAt(x);
-                final List<SlotConfigurer<V>> list = this.configurers.get(ch);
+                final List<SlotConfigurer<V, CC>> list = this.configurers.get(ch);
 
                 if (list == null) {
                     continue;
                 }
                 final int index = counters.getOrDefault(ch, 0);
 
-                for (final SlotConfigurer<V> configurer : list) {
+                for (final SlotConfigurer<V, CC> configurer : list) {
                     configurer.configure(index, x, y, new BuilderImpl<>(context, x, y));
                 }
                 counters.put(ch, index + 1);
@@ -124,21 +126,21 @@ public final class LayoutContainer<V> extends ViewComponent<V, Void> {
         }
     }
 
-    private static final class BuilderImpl<V> implements SlotBuilder<V> {
-        private final RenderContext<V, Void> context;
+    private static final class BuilderImpl<V, C extends IClickContext<V>> implements SlotBuilder<V, C> {
+        private final IRenderContext<V, Void, C> context;
         private final int x;
         private final int y;
         private ViewRenderable renderable;
-        private ClickHandler<V> click;
+        private ClickHandler<V, C> click;
 
-        BuilderImpl(@NotNull final RenderContext<V, Void> context, final int x, final int y) {
+        BuilderImpl(@NotNull final IRenderContext<V, Void, C> context, final int x, final int y) {
             this.context = context;
             this.x = x;
             this.y = y;
         }
 
         @Override
-        public @NotNull SlotBuilder<V> item(@NotNull final ViewRenderable renderable) {
+        public @NotNull SlotBuilder<V, C> item(@NotNull final ViewRenderable renderable) {
             this.renderable = renderable;
             this.flush();
 
@@ -146,7 +148,7 @@ public final class LayoutContainer<V> extends ViewComponent<V, Void> {
         }
 
         @Override
-        public @NotNull SlotBuilder<V> onClick(@Nullable final ClickHandler<V> clickHandler) {
+        public @NotNull SlotBuilder<V, C> onClick(@Nullable final ClickHandler<V, C> clickHandler) {
             this.click = clickHandler;
             this.flush();
 

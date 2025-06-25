@@ -1,7 +1,9 @@
-package ravioli.gravioli.gui.api;
+package ravioli.gravioli.gui.api.session;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnmodifiableView;
+import ravioli.gravioli.gui.api.IView;
 import ravioli.gravioli.gui.api.schedule.Scheduler;
 
 import java.util.Collection;
@@ -12,7 +14,14 @@ import java.util.Collection;
  *
  * @param <V> type of the viewer (e.g., player, client session, etc.)
  */
-public interface ViewSession<V> {
+public interface IViewSession<V, D> {
+    /**
+     * Return any properties supplied when opening the view, or null if none.
+     *
+     * @return the props passed to this view or null
+     */
+    @Nullable D getProps();
+
     /**
      * Returns the viewer associated with this session.
      *
@@ -27,7 +36,7 @@ public interface ViewSession<V> {
      * @return the root View instance; never null
      */
     @NotNull
-    View<V, ?> getRoot();
+    IView<V, D, ?, ?, ?, ?> getRoot();
 
     /**
      * Attaches a scheduled task to this session so that it will be

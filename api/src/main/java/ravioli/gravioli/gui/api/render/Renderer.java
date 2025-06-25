@@ -1,6 +1,10 @@
-package ravioli.gravioli.gui.api;
+package ravioli.gravioli.gui.api.render;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import ravioli.gravioli.gui.api.IView;
+import ravioli.gravioli.gui.api.reconciliation.Patch;
+import ravioli.gravioli.gui.api.session.IViewSession;
 
 /**
  * Defines how a view tree is mounted, updated, and unmounted for a particular
@@ -8,7 +12,7 @@ import org.jetbrains.annotations.NotNull;
  *
  * @param <V> type of the viewer (for example, a UI client or user session)
  */
-public interface Renderer<V> {
+public interface Renderer<V, D, V2 extends IView<V, D, ?, ?, ?, ?>> {
     /**
      * Mounts the root view for a given viewer, creating any necessary UI elements
      * or resources. This is invoked once before the first render.
@@ -20,8 +24,9 @@ public interface Renderer<V> {
      * @return a session handle that will be used for subsequent updates and unmount
      */
     @NotNull
-    ViewSession<V> mount(
-        @NotNull View<V, ?> rootView,
+    IViewSession<V, D> mount(
+        @NotNull V2 rootView,
+        @Nullable D initialProps,
         @NotNull V viewer,
         @NotNull Object title,
         int size
@@ -35,7 +40,7 @@ public interface Renderer<V> {
      * @implNote it's expected for renderers to track their own view session as well due to the nature of a single
      * renderer being associated with a single view session.
      */
-    void unmount(ViewSession<V> session);
+    void unmount(IViewSession<V, D> session);
 
     /**
      * Applies a diff patch to the mounted UI, updating only the changed slots

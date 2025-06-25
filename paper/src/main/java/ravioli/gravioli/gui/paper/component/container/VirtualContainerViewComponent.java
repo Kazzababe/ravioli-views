@@ -5,11 +5,12 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import ravioli.gravioli.gui.api.Ref;
-import ravioli.gravioli.gui.api.ViewComponent;
-import ravioli.gravioli.gui.api.ViewRenderable;
-import ravioli.gravioli.gui.api.context.RenderContext;
+import ravioli.gravioli.gui.api.context.IRenderContext;
+import ravioli.gravioli.gui.api.render.ViewRenderable;
+import ravioli.gravioli.gui.api.state.Ref;
 import ravioli.gravioli.gui.paper.PaperComponents;
+import ravioli.gravioli.gui.paper.component.ViewComponent;
+import ravioli.gravioli.gui.paper.context.RenderContext;
 
 import java.util.Arrays;
 
@@ -29,7 +30,7 @@ import java.util.Arrays;
  * ItemStack right   = chest.get().get(2);
  * }</pre>
  */
-public final class PaperVirtualContainer extends ViewComponent<Player, Void> {
+public final class VirtualContainerViewComponent extends ViewComponent<Void> {
     public interface Handle {
         /**
          * Returns the live item in this container slot (may be null).
@@ -59,7 +60,7 @@ public final class PaperVirtualContainer extends ViewComponent<Player, Void> {
 
     private final ViewRenderable[] backing;
 
-    public PaperVirtualContainer(final int width, final int height, @NotNull final Ref<Handle> handleRef) {
+    public VirtualContainerViewComponent(final int width, final int height, @NotNull final Ref<Handle> handleRef) {
         if (width <= 0 || height <= 0) {
             throw new IllegalArgumentException("width/height must be > 0");
         }
@@ -82,7 +83,7 @@ public final class PaperVirtualContainer extends ViewComponent<Player, Void> {
     }
 
     @Override
-    public void render(@NotNull final RenderContext<Player, Void> context) {
+    public void render(@NotNull final RenderContext<Void> context) {
         if (this.handleRef.isEmpty()) {
             this.handleRef.set(new ImperativeHandle(context));
         }
@@ -99,22 +100,22 @@ public final class PaperVirtualContainer extends ViewComponent<Player, Void> {
         private final int originX;
         private final int originY;
 
-        private ImperativeHandle(@NotNull final RenderContext<Player, ?> context) {
+        private ImperativeHandle(@NotNull final IRenderContext<Player, ?, ?> context) {
             this.inventory = context.getViewer().getOpenInventory().getTopInventory();
             this.originX = context.getOriginX();
             this.originY = context.getOriginY();
         }
 
         private int toRootSlot(final int local) {
-            final int localX = local % PaperVirtualContainer.this.width;
-            final int localY = local / PaperVirtualContainer.this.width;
+            final int localX = local % VirtualContainerViewComponent.this.width;
+            final int localY = local / VirtualContainerViewComponent.this.width;
 
             return (this.originY + localY) * 9 + (this.originX + localX);
         }
 
         @Override
         public @Nullable ItemStack get(final int slot) {
-            if (slot < 0 || slot >= PaperVirtualContainer.this.backing.length) {
+            if (slot < 0 || slot >= VirtualContainerViewComponent.this.backing.length) {
                 return null;
             }
             return this.inventory.getItem(this.toRootSlot(slot));
@@ -122,24 +123,24 @@ public final class PaperVirtualContainer extends ViewComponent<Player, Void> {
 
         @Override
         public @Nullable ItemStack get(final int x, final int y) {
-            return this.get(y * PaperVirtualContainer.this.width + x);
+            return this.get(y * VirtualContainerViewComponent.this.width + x);
         }
 
         @Override
         public void set(final int slot, @Nullable final ItemStack item) {
-            if (slot < 0 || slot >= PaperVirtualContainer.this.backing.length) {
+            if (slot < 0 || slot >= VirtualContainerViewComponent.this.backing.length) {
                 return;
             }
             this.inventory.setItem(this.toRootSlot(slot), item);
 
-            PaperVirtualContainer.this.backing[slot] = item == null
+            VirtualContainerViewComponent.this.backing[slot] = item == null
                 ? EditableToken.INSTANCE
                 : PaperComponents.item(item);
         }
 
         @Override
         public int size() {
-            return PaperVirtualContainer.this.backing.length;
+            return VirtualContainerViewComponent.this.backing.length;
         }
     }
 

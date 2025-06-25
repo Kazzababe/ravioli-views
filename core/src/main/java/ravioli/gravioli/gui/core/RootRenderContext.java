@@ -3,15 +3,16 @@ package ravioli.gravioli.gui.core;
 import org.bukkit.Bukkit;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import ravioli.gravioli.gui.api.ClickHandler;
-import ravioli.gravioli.gui.api.Ref;
-import ravioli.gravioli.gui.api.State;
-import ravioli.gravioli.gui.api.StateSupplier;
-import ravioli.gravioli.gui.api.ViewComponent;
-import ravioli.gravioli.gui.api.ViewRenderable;
-import ravioli.gravioli.gui.api.ViewSession;
-import ravioli.gravioli.gui.api.context.RenderContext;
+import ravioli.gravioli.gui.api.component.IViewComponent;
+import ravioli.gravioli.gui.api.context.IClickContext;
+import ravioli.gravioli.gui.api.context.IRenderContext;
+import ravioli.gravioli.gui.api.interaction.ClickHandler;
+import ravioli.gravioli.gui.api.render.ViewRenderable;
 import ravioli.gravioli.gui.api.schedule.Scheduler;
+import ravioli.gravioli.gui.api.session.IViewSession;
+import ravioli.gravioli.gui.api.state.Ref;
+import ravioli.gravioli.gui.api.state.State;
+import ravioli.gravioli.gui.api.state.StateSupplier;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -24,7 +25,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
-final class RootRenderContext<V, D> implements RenderContext<V, D> {
+public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRenderContext<V, D, C> {
     private static final int WIDTH = 9;
 
     private final Map<String, List<State<?>>> stateMap;
@@ -32,12 +33,12 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
     private final Set<String> visited;
 
     private final Map<Integer, ViewRenderable> renderables;
-    private final Map<Integer, ClickHandler<V>> clicks;
+    private final Map<Integer, ClickHandler<V, C>> clicks;
 
     private final D props;
     private final Scheduler scheduler;
     private final Runnable schedule;
-    private final ViewSession<V> instance;
+    private final IViewSession<V, D> instance;
     private final Deque<String> pathStack = new ArrayDeque<>();
     private final Map<String, Integer> overlayCounters = new HashMap<>();
 
@@ -46,12 +47,12 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
     private int batchDepth = 0;
     private boolean dirtyBatch = false;
 
-    RootRenderContext(
+    public RootRenderContext(
         @Nullable final D props,
         @NotNull final Scheduler scheduler,
-        @NotNull final ViewSession<V> instance,
+        @NotNull final IViewSession<V, D> instance,
         @NotNull final Map<Integer, ViewRenderable> renderables,
-        @NotNull final Map<Integer, ClickHandler<V>> clicks,
+        @NotNull final Map<Integer, ClickHandler<V, C>> clicks,
         @NotNull final Map<String, List<State<?>>> stateMap,
         @NotNull final Map<String, List<Ref<?>>> refMap,
         @NotNull final Set<String> visited,
@@ -131,22 +132,30 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
     @Override
     public @NotNull <T> State<T> useAsyncState(@NotNull final Supplier<T> defaultValueSupplier) {
         final State<T> state = this.useState((T) null);
+        final Ref<Boolean> tried = this.useRef(false); // Needed to prevent re-instantiation of new futures
 
-        CompletableFuture
-            .supplyAsync(defaultValueSupplier)
-            .thenAcceptAsync(state::set, this.scheduler::run);
+        if (!tried.get()) {
+            tried.set(true);
 
+            CompletableFuture
+                .supplyAsync(defaultValueSupplier)
+                .thenAcceptAsync(state::set, this.scheduler::run);
+        }
         return state;
     }
 
     @Override
     public @NotNull <T> State<T> useAsyncState(@NotNull final Supplier<T> defaultValueSupplier, @NotNull final Executor executor) {
         final State<T> state = this.useState((T) null);
+        final Ref<Boolean> tried = this.useRef(false); // Needed to prevent re-instantiation of new futures
 
-        CompletableFuture
-            .supplyAsync(defaultValueSupplier, executor)
-            .thenAcceptAsync(state::set, this.scheduler::run);
+        if (!tried.get()) {
+            tried.set(true);
 
+            CompletableFuture
+                .supplyAsync(defaultValueSupplier, executor)
+                .thenAcceptAsync(state::set, this.scheduler::run);
+        }
         return state;
     }
 
@@ -204,7 +213,7 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
     }
 
     @Override
-    public <K> void set(final int slot, final @NotNull ViewComponent<V, K> component) {
+    public <K> void set(final int slot, @NotNull final IViewComponent<V, K, ?> component) {
         final int localX = slot % WIDTH;
         final int localY = slot / WIDTH;
 
@@ -215,7 +224,7 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
     public <K> void set(
         final int x,
         final int y,
-        @NotNull final ViewComponent<V, K> component,
+        @NotNull final IViewComponent<V, K, ?> component,
         @Nullable final K props
     ) {
         final String slotSeg = "slot[" + x + "," + y + "]";
@@ -225,15 +234,26 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
         final String childPath = basePath + "#" + keyPart;
 
         this.pathStack.push(childPath);
-        this.visited.add(childPath);
+        this.visited.add(this.currentPath());
         this.resetCursor();
 
         try {
-            new ChildContext<>(props, x, y, component.getWidth(), component.getHeight()).renderComponent(component);
+            this.createChildContext(props, x, y, component.getWidth(), component.getHeight()).renderComponent(component);
         } finally {
             this.pathStack.pop();
+            this.overlayCounters.remove(basePath);
             this.resetCursor();
         }
+    }
+
+    protected <K> @NotNull ChildContext<K> createChildContext(
+        @Nullable final K props,
+        final int x,
+        final int y,
+        final int width,
+        final int height
+    ) {
+        return new ChildContext<>(props, x, y, width, height);
     }
 
     @Override
@@ -247,7 +267,7 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
     }
 
     @Override
-    public void set(final int x, final int y, @NotNull final ViewRenderable r, @NotNull final ClickHandler<V> clickHandler) {
+    public void set(final int x, final int y, @NotNull final ViewRenderable r, @NotNull final ClickHandler<V, C> clickHandler) {
         final int slot = this.rootSlot(x, y);
 
         if (slot == -1) {
@@ -263,7 +283,7 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
     }
 
     @Override
-    public void set(final int slot, @NotNull final ViewRenderable renderable, @NotNull final ClickHandler<V> clickHandler) {
+    public void set(final int slot, @NotNull final ViewRenderable renderable, @NotNull final ClickHandler<V, C> clickHandler) {
         this.renderables.put(slot, renderable);
         this.clicks.put(slot, clickHandler);
     }
@@ -295,14 +315,14 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
         return 0;
     }
 
-    private class ChildContext<K> implements RenderContext<V, K> {
+    public class ChildContext<K> implements IRenderContext<V, K, C> {
         private final K props;
         private final int originX;
         private final int originY;
         private final int limitWidth;
         private final int limitHeight;
 
-        ChildContext(
+        public ChildContext(
             @Nullable final K props,
             final int originX,
             final int originY,
@@ -344,8 +364,9 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
             return RootRenderContext.this.rootSlot(rootX, rootY);
         }
 
-        private void renderComponent(final ViewComponent<V, K> component) {
-            component.render(this);
+        @SuppressWarnings("unchecked")
+        public void renderComponent(final @NotNull IViewComponent<V, K, ?> component) {
+            ((IViewComponent) component).render(this);
         }
 
         @Override
@@ -404,7 +425,7 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
         }
 
         @Override
-        public <L> void set(final int slot, final @NotNull ViewComponent<V, L> component) {
+        public <L> void set(final int slot, @NotNull final IViewComponent<V, L, ?> component) {
             final int mappedSlot = this.mapSlot(slot);
 
             if (mappedSlot != -1) {
@@ -413,7 +434,7 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
         }
 
         @Override
-        public <L> void set(final int x, final int y, @NotNull final ViewComponent<V, L> component, @Nullable final L props) {
+        public <L> void set(final int x, final int y, @NotNull final IViewComponent<V, L, ?> component, @Nullable final L props) {
             if (this.inBounds(x, y)) {
                 RootRenderContext.this.set(this.mapX(x), this.mapY(y), component, props);
             }
@@ -427,7 +448,7 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
         }
 
         @Override
-        public void set(final int x, final int y, @NotNull final ViewRenderable renderable, @NotNull final ClickHandler<V> clickHandler) {
+        public void set(final int x, final int y, @NotNull final ViewRenderable renderable, @NotNull final ClickHandler<V, C> clickHandler) {
             if (this.inBounds(x, y)) {
                 RootRenderContext.this.set(this.mapX(x), this.mapY(y), renderable, clickHandler);
             }
@@ -443,7 +464,7 @@ final class RootRenderContext<V, D> implements RenderContext<V, D> {
         }
 
         @Override
-        public void set(final int slot, @NotNull final ViewRenderable renderable, @NotNull final ClickHandler<V> clickHandler) {
+        public void set(final int slot, @NotNull final ViewRenderable renderable, @NotNull final ClickHandler<V, C> clickHandler) {
             final int root = this.mapSlot(slot);
 
             if (root != -1) {

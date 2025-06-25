@@ -3,33 +3,42 @@ package ravioli.gravioli.gui.paper;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnmodifiableView;
-import ravioli.gravioli.gui.api.View;
-import ravioli.gravioli.gui.api.ViewSession;
 import ravioli.gravioli.gui.api.schedule.Scheduler;
+import ravioli.gravioli.gui.api.session.IViewSession;
+import ravioli.gravioli.gui.paper.view.View;
 
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
-final class PaperSession implements ViewSession<Player> {
-    private final View<Player, ?> rootView;
+public final class ViewSession<D> implements IViewSession<Player, D> {
+    private final View<D> rootView;
+    private final D initialProps;
     private final Player player;
     private final Inventory inventory;
-    private final PaperInventoryRenderer renderer;
+    private final PaperInventoryRenderer<D> renderer;
 
     private final Set<Scheduler.TaskHandle> scheduledTasks = new HashSet<>();
 
-    PaperSession(
-        @NotNull final View<Player, ?> rootView,
+    ViewSession(
+        @NotNull final View<D> rootView,
+        @Nullable final D initialProps,
         @NotNull final Player player,
         @NotNull final Inventory inventory,
-        @NotNull final PaperInventoryRenderer renderer
+        @NotNull final PaperInventoryRenderer<D> renderer
     ) {
         this.rootView = rootView;
+        this.initialProps = initialProps;
         this.player = player;
         this.inventory = inventory;
         this.renderer = renderer;
+    }
+
+    @Override
+    public @Nullable D getProps() {
+        return this.initialProps;
     }
 
     @Override
@@ -38,7 +47,7 @@ final class PaperSession implements ViewSession<Player> {
     }
 
     @Override
-    public @NotNull View<Player, ?> getRoot() {
+    public @NotNull View<D> getRoot() {
         return this.rootView;
     }
 
@@ -61,7 +70,7 @@ final class PaperSession implements ViewSession<Player> {
         return this.inventory;
     }
 
-    public @NotNull PaperInventoryRenderer renderer() {
+    public @NotNull PaperInventoryRenderer<D> renderer() {
         return this.renderer;
     }
 }
