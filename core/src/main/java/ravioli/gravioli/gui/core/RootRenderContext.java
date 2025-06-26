@@ -315,6 +315,11 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
         return 0;
     }
 
+    @Override
+    public void requestUpdate() {
+        this.scheduler.run(this.schedule::run);
+    }
+
     public class ChildContext<K> implements IRenderContext<V, K, C> {
         private final K props;
         private final int originX;
@@ -485,6 +490,11 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
         @Override
         public int getOriginY() {
             return this.originY;
+        }
+
+        @Override
+        public void requestUpdate() {
+            RootRenderContext.this.requestUpdate();
         }
     }
 }

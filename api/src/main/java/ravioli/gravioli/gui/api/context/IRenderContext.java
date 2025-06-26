@@ -298,7 +298,22 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
      */
     void batch(@NotNull  Runnable work);
 
+    /**
+     * Returns the X origin offset for nested grid rendering.
+     *
+     * @return origin column index
+     */
     int getOriginX();
 
+    /**
+     * Returns the Y origin offset for nested grid rendering.
+     *
+     * @return origin row index
+     */
     int getOriginY();
+
+    /**
+     * Requests an asynchronous view update (re-render) at the next tick.
+     */
+    void requestUpdate();
 }

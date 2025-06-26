@@ -39,5 +39,12 @@ public abstract class IView<
      */
     public abstract void render(@NotNull RC context);
 
+    /**
+     * Invoked when the view is closed or the viewer quits. Clean up any
+     * resources, unregister listeners, and perform teardown logic here.
+     *
+     * @param context close context providing the viewer and any props
+     *                available at closure time
+     */
     public abstract void close(@NotNull EC context);
 }
