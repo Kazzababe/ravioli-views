@@ -1,15 +1,18 @@
 package ravioli.gravioli.gui.api.state;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.UnknownNullability;
 
 public final class Ref<T> {
     private volatile T value;
 
-    public Ref(@NotNull final T initialValue) {
+    public Ref(@Nullable final T initialValue) {
         this.value = initialValue;
     }
 
-    public @NotNull T get() {
+    @UnknownNullability
+    public T get() {
         return this.value;
     }
 

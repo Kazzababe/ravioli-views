@@ -7,6 +7,7 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import ravioli.gravioli.gui.paper.ViewManager;
+import ravioli.gravioli.gui.paper.view.PaginatedView;
 import ravioli.gravioli.gui.paper.view.SimpleCounterView;
 import ravioli.gravioli.gui.paper.view.View;
 import ravioli.gravioli.gui.paper.view.VirtualInventoryView;
@@ -71,7 +72,8 @@ public final class OpenViewCommand implements CommandExecutor, TabCompleter {
 
     public enum Views {
         COUNTER(SimpleCounterView.class),
-        VIRTUAL_INVENTORY(VirtualInventoryView.class);
+        VIRTUAL_INVENTORY(VirtualInventoryView.class),
+        PAGINATION(PaginatedView.class);
 
         private final Class<? extends View<?>> viewClass;
 

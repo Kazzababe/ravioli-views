@@ -88,7 +88,7 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
     }
 
     @Override
-    public @NotNull <T> Ref<T> useRef(@NotNull final T defaultValue) {
+    public @NotNull <T> Ref<T> useRef(@Nullable final T defaultValue) {
         return this.getRef(() -> defaultValue);
     }
 
@@ -160,7 +160,7 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
     }
 
     @Override
-    public @NotNull <T> State<T> useState(@NotNull final T defaultValue) {
+    public @NotNull <T> State<T> useState(@Nullable final T defaultValue) {
         return this.getState(() -> defaultValue);
     }
 
@@ -317,7 +317,7 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
 
     @Override
     public void requestUpdate() {
-        this.scheduler.run(this.schedule::run);
+        this.scheduler.run(this.schedule);
     }
 
     public class ChildContext<K> implements IRenderContext<V, K, C> {
@@ -369,7 +369,7 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
             return RootRenderContext.this.rootSlot(rootX, rootY);
         }
 
-        @SuppressWarnings("unchecked")
+        @SuppressWarnings({"unchecked", "rawtypes"})
         public void renderComponent(final @NotNull IViewComponent<V, K, ?> component) {
             ((IViewComponent) component).render(this);
         }
@@ -390,7 +390,7 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
         }
 
         @Override
-        public @NotNull <T> Ref<T> useRef(@NotNull final T defaultValue) {
+        public @NotNull <T> Ref<T> useRef(@Nullable final T defaultValue) {
             return RootRenderContext.this.useRef(defaultValue);
         }
 

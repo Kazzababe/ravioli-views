@@ -5,6 +5,7 @@ import org.bukkit.command.PluginCommand;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 import ravioli.gravioli.gui.paper.command.OpenViewCommand;
+import ravioli.gravioli.gui.paper.view.PaginatedView;
 import ravioli.gravioli.gui.paper.view.SimpleCounterView;
 import ravioli.gravioli.gui.paper.view.VirtualInventoryView;
 
@@ -17,6 +18,7 @@ public final class ExamplePaperPlugin extends JavaPlugin implements Listener {
     public void onEnable() {
         this.viewManager.registerView(new SimpleCounterView());
         this.viewManager.registerView(new VirtualInventoryView());
+        this.viewManager.registerView(new PaginatedView());
         this.viewManager.register();
 
         Bukkit.getPluginManager().registerEvents(this, this);

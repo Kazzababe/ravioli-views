@@ -87,6 +87,8 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         final State<Integer> pages = context.useState(-1);
         final State<Boolean> busy = context.useState(false);
 
+        final Ref<Integer> lastLoadedPage = context.useRef(() -> -1);
+
         if (this.handleRef.isEmpty()) {
             this.handleRef.set(new Handle() {
                 @Override
@@ -115,20 +117,30 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
                 }
             });
         }
-        if (items.get().isEmpty() && !busy.get()) {
+        final int capacity = this.width * this.height;
+
+        if (!busy.get() && !page.get().equals(lastLoadedPage.get())) {
             busy.set(true);
+            items.set(Collections.emptyList()); // optional: clears stale content
 
             final int target = page.get();
 
-            this.loader.accept(target, (list, total) -> context.getScheduler().run(() -> {
-                items.set(list);
-                pages.set(total);
-                busy.set(false);
-            }));
+            this.loader.accept(target, (final List<T> list, final Integer total) ->
+                context.getScheduler().run(() -> {
+                    // Drop stale responses.
+                    if (page.get() != target) {
+                        return;
+                    }
+                    items.set(list);
+                    pages.set((int) Math.ceil(total / (double) capacity));
+                    lastLoadedPage.set(target);
+                    busy.set(false);
+                })
+            );
         }
         final List<T> data = items.get();
 
-        for (int i = 0; i < data.size() && i < this.width * this.height; i++) {
+        for (int i = 0; i < data.size() && i < capacity; i++) {
             final int x = i % this.width;
             final int y = i / this.width;
 

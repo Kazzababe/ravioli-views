@@ -1,7 +1,7 @@
 package ravioli.gravioli.gui.api.state;
 
-import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public interface StateSupplier<T> {
-    @NotNull T get();
+    @Nullable T get();
 }

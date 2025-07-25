@@ -60,6 +60,20 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
     D getProps();
 
     /**
+     * Allocates a <em>reference</em> — a piece of mutable data initialized to
+     * {@code null} on first render, and returned for every subsequent render
+     * until the component unmounts. Mutating it will <strong>not</strong>
+     * automatically trigger a reconciliation.
+     *
+     * @param <T> type of the reference value
+     * @return a Ref whose initial value is null
+     */
+    @NotNull
+    default <T> Ref<T> useRef() {
+        return this.useRef((T) null);
+    }
+
+    /**
      * Allocates a <em>reference</em> — a piece of mutable data that survives
      * across renders <strong>without</strong> scheduling a new render when it
      * changes. Think of it as an escape hatch for timers, cached objects, or
@@ -75,7 +89,7 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
      * @param <T>          type of the reference value
      * @return a Ref containing the supplied initial value
      */
-    @NotNull <T> Ref<T> useRef(@NotNull T initialValue);
+    @NotNull <T> Ref<T> useRef(@Nullable T initialValue);
 
     /**
      * Variant of {@link #useRef(Object)} where the initial value is computed
