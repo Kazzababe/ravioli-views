@@ -257,11 +257,19 @@ public final class ViewManager {
 
         @EventHandler
         private void onClose(@NotNull final InventoryCloseEvent event) {
-            final ViewSession session = ViewManager.this.sessions.remove(event.getPlayer().getUniqueId());
+            if (!(event.getPlayer() instanceof final Player player)) {
+                return;
+            }
+            final ViewSession session = ViewManager.this.sessions.remove(player.getUniqueId());
 
             if (session == null) {
                 return;
             }
+            session.getRoot().close(new CloseContext<>(
+                player,
+                null,
+                session.inventory()
+            ));
             session.renderer().unmount(session);
         }
 

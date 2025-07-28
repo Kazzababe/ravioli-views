@@ -33,4 +33,6 @@ public final class VirtualInventoryView extends ProplessView {
         );
         context.set(1, 1, new VirtualContainerViewComponent(7, 1, virtualContainer));
     }
+
+
 }
