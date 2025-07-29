@@ -112,6 +112,8 @@ jreleaser {
 
     release {
         github {
+            enabled.set(false)
+
             repoOwner.set(authorAlias)
             tagName.set("v${project.version}")
             releaseName.set("Ravioli Views ${project.version}")
