@@ -19,21 +19,23 @@ tasks {
     assemble {
         dependsOn(reobfJar)
     }
+
+    reobfJar {
+        outputJar.set(file("${layout.buildDirectory}/libs/${project.name}-$version.jar"))
+    }
 }
 
 publishing {
     publications {
         create<MavenPublication>("mavenJava") {
-            groupId = "com.github.Kazzababe.ravioli-views"
-            artifactId = "paper"
+            artifactId = "ravioli-views-paper"
 
             artifact(tasks.reobfJar) {
                 classifier = ""
             }
-        }
-    }
 
-    repositories {
-        mavenLocal()
+            artifact(tasks.sourcesJar)
+            artifact(tasks.javadocJar)
+        }
     }
 }

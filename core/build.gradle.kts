@@ -1,25 +1,18 @@
 plugins {
     `java-library`
-    alias(libs.plugins.paperweight)
 }
 
 dependencies {
     api(projects.api)
-
-    paperweight.paperDevBundle(rootProject.libs.versions.paper.get())
 }
 
 publishing {
     publications {
         create<MavenPublication>("mavenJava") {
-            groupId = "com.github.Kazzababe.ravioli-views"
-            artifactId = "core"
+            artifactId = "ravioli-views-core"
 
-            from(components["java"])
+            artifact(tasks.sourcesJar)
+            artifact(tasks.javadocJar)
         }
-    }
-
-    repositories {
-        mavenLocal()
     }
 }
