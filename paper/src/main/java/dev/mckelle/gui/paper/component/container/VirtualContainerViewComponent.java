@@ -88,7 +88,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
     private final int height;
     private final Ref<Handle> handleRef;
     private final ViewRenderable[] backing;
-    private final ViewRenderable[] initialItems;
+    private final ItemStack[] initialItems;
     private Predicate<ItemStack> filter = Predicates.alwaysTrue();
     private Consumer<ChangeEvent> onChange = null;
 
@@ -108,7 +108,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
         this.height = height;
         this.handleRef = handleRef;
         this.backing = new ViewRenderable[width * height];
-        this.initialItems = new ViewRenderable[width * height];
+        this.initialItems = new ItemStack[width * height];
 
         Arrays.fill(this.backing, new EditableSlot(this.filter, this.onChange));
     }
@@ -165,7 +165,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
             if (itemStack == null || itemStack.isEmpty()) {
                 continue;
             }
-            this.initialItems[i] = PaperComponents.item(itemStack);
+            this.initialItems[i] = itemStack;
         }
         return this;
     }
@@ -184,7 +184,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
             if (itemStack == null || itemStack.isEmpty()) {
                 continue;
             }
-            this.initialItems[i] = PaperComponents.item(itemStack);
+            this.initialItems[i] = itemStack;
         }
         return this;
     }
@@ -222,12 +222,12 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
         }
         if (!hasRendered.get()) {
             for (int i = 0; i < this.backing.length; i++) {
-                final ViewRenderable renderable = this.initialItems[i];
+                final ItemStack initialItem = this.initialItems[i];
 
-                if (renderable == null) {
+                if (initialItem == null) {
                     continue;
                 }
-                this.backing[i] = renderable;
+                this.handleRef.get().set(i, initialItem);
             }
             hasRendered.set(true);
         }
@@ -300,10 +300,6 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
                 return;
             }
             this.inventory.setItem(this.toRootSlot(slot), item);
-
-            VirtualContainerViewComponent.this.backing[slot] = item == null
-                ? new EditableSlot(VirtualContainerViewComponent.this.filter, VirtualContainerViewComponent.this.onChange)
-                : PaperComponents.item(item);
         }
 
         /**
