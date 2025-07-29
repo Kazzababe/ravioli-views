@@ -11,19 +11,60 @@ import ravioli.gravioli.gui.paper.component.container.VirtualContainerViewCompon
 
 import java.util.List;
 import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 
+/**
+ * Utility class providing factory methods for creating Paper-specific GUI components.
+ * This class contains static methods for creating various types of components
+ * that are commonly used in Paper/Spigot GUI applications.
+ */
 public final class PaperComponents {
+    
+    /**
+     * Private constructor to prevent instantiation.
+     */
     private PaperComponents() {
     }
 
-    public static @NotNull ViewRenderable item(@NotNull final ItemStack stack) {
-        return new ItemRenderable(stack);
+    /**
+     * Creates a renderable item from a static ItemStack.
+     *
+     * @param itemStack the ItemStack to render
+     * @return a ViewRenderable representing the item
+     */
+    public static @NotNull ViewRenderable item(@NotNull final ItemStack itemStack) {
+        return new ItemRenderable(itemStack);
     }
 
+    /**
+     * Creates a renderable item from a supplier that provides ItemStacks.
+     * The supplier is called each time the item needs to be rendered.
+     *
+     * @param itemStackSupplier the supplier that provides ItemStacks
+     * @return a ViewRenderable representing the item
+     */
+    public static @NotNull ViewRenderable item(@NotNull final Supplier<ItemStack> itemStackSupplier) {
+        return new ItemRenderable(itemStackSupplier.get());
+    }
+
+    /**
+     * Creates a layout container component using a character mask.
+     *
+     * @param mask the character mask defining the layout structure
+     * @return a new LayoutContainerViewComponent
+     */
     public static @NotNull LayoutContainerViewComponent layoutContainer(@NotNull final String... mask) {
         return new LayoutContainerViewComponent(mask);
     }
 
+    /**
+     * Creates a virtual container component for managing editable slots.
+     *
+     * @param width the width of the container in slots
+     * @param height the height of the container in slots
+     * @param handleRef a reference that will receive the container handle
+     * @return a new VirtualContainerViewComponent
+     */
     public static @NotNull VirtualContainerViewComponent virtualContainer(
         final int width,
         final int height,
@@ -32,6 +73,17 @@ public final class PaperComponents {
         return new VirtualContainerViewComponent(width, height, handleRef);
     }
 
+    /**
+     * Creates a paginated container component for displaying paginated data.
+     *
+     * @param width the width of the container in slots
+     * @param height the height of the container in slots
+     * @param loader the data loader function
+     * @param renderer the cell renderer for individual items
+     * @param handleRef a reference that will receive the pagination handle
+     * @return a new PaginatedContainerViewComponent
+     * @param <T> the type of items in the paginated container
+     */
     public static <T> @NotNull PaginatedContainerViewComponent<T> paginatedContainer(
         final int width,
         final int height,
@@ -42,6 +94,11 @@ public final class PaperComponents {
         return new PaginatedContainerViewComponent<>(width, height, loader, renderer, handleRef);
     }
 
+    /**
+     * A record representing a renderable item backed by a Bukkit ItemStack.
+     *
+     * @param stack the ItemStack to render
+     */
     record ItemRenderable(@NotNull ItemStack stack) implements ViewRenderable {
     }
 }

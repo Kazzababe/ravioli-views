@@ -15,29 +15,71 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 /**
- * Generic paginated container.  A data-loader supplies a page of items
- * synchronously or asynchronously; the component keeps track of the
- * current page and exposes an {@link Handle} via an imperative ref so
- * parents can turn pages programmatically.
+ * A generic paginated container where a data-loader supplies items for each page.
+ * <p>
+ * The component manages the current page state and provides a {@link Handle} via a
+ * {@link Ref} so parent components can programmatically control navigation.
+ * </p>
  *
- * @param <V> viewer type
- * @param <T> item model type
+ * @param <V>  The viewer type.
+ * @param <T>  The type of the items being paginated.
+ * @param <CC> The click context type.
+ * @param <RC> The render context type.
  */
 public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, RC extends IRenderContext<V, Void, CC>> extends IViewComponent<V, Void, RC> {
+
+    /**
+     * An imperative handle for controlling pagination programmatically. It provides
+     * methods to navigate between pages and query the current pagination state.
+     */
     public interface Handle {
+        /**
+         * Navigates to the next page, if one is available.
+         */
         void next();
 
+        /**
+         * Navigates to the previous page, if one is available.
+         */
         void previous();
 
+        /**
+         * Jumps directly to a specific page number.
+         *
+         * @param page The 0-based page number to navigate to.
+         */
         void gotoPage(int page);
 
+        /**
+         * Gets the current page number.
+         *
+         * @return The current 0-based page number.
+         */
         int currentPage();
 
-        int totalPages(); // -1 if unknown
+        /**
+         * Gets the total number of pages.
+         *
+         * @return The total number of pages, or -1 if it is not yet known.
+         */
+        int totalPages();
     }
 
+    /**
+     * A functional interface for rendering a single item within the paginated container.
+     *
+     * @param <V> The viewer type.
+     * @param <T> The item type.
+     */
     @FunctionalInterface
     public interface CellRenderer<V, T> {
+        /**
+         * Renders a given item into a {@link ViewRenderable}.
+         *
+         * @param value The item model to render.
+         * @param index The 0-based index of the item on the current page.
+         * @return The non-null {@link ViewRenderable} representation of the item.
+         */
         @NotNull ViewRenderable render(@NotNull T value, int index);
     }
 
@@ -48,13 +90,17 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
     private final Ref<Handle> handleRef;
 
     /**
-     * Creates a paginated container.
+     * Creates a new paginated container.
      *
-     * @param width     columns inside the container
-     * @param height    rows inside the container
-     * @param loader    function: (pageIndex, pageSize) -> List<T>  (sync)
-     * @param renderer  maps T -> ViewRenderable
-     * @param handleRef a Ref that will be populated with the Handle
+     * @param width     The width of the container in columns.
+     * @param height    The height of the container in rows.
+     * @param loader    A function that loads data for a given page. It accepts the page
+     * index and a callback, which should be invoked with the loaded
+     * item list and the total number of pages.
+     * @param renderer  A function that transforms an item of type {@code T} into a
+     * {@link ViewRenderable}.
+     * @param handleRef A {@link Ref} that will be populated with the {@link Handle} on
+     * first render, allowing for programmatic control.
      */
     public PaginatedContainerViewComponent(
         final int width,
@@ -70,16 +116,30 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         this.handleRef = handleRef;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public int getWidth() {
         return this.width;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public int getHeight() {
         return this.height;
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This method manages the component's state, including the current page and the
+     * items to display. It triggers the data loader when the page changes and renders
+     * the items for the current page using the provided cell renderer.
+     * </p>
+     */
     @Override
     public void render(@NotNull final RC context) {
         final State<Integer> page = context.useState(0);
@@ -148,6 +208,13 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         }
     }
 
+    /**
+     * Changes the current page to the target page if it is within valid bounds.
+     *
+     * @param page   The state object holding the current page number.
+     * @param total  The state object holding the total number of pages.
+     * @param target The target page number to navigate to.
+     */
     private void changePage(
         @NotNull final State<Integer> page,
         @NotNull final State<Integer> total,
@@ -167,6 +234,20 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         page.set(target);
     }
 
+    /**
+     * Creates a paginated container for a static, pre-loaded list of items.
+     *
+     * @param width    The number of columns in the container.
+     * @param height   The number of rows in the container.
+     * @param fullList The complete list of items to paginate.
+     * @param renderer The renderer for individual items.
+     * @param handle   The ref that will receive the pagination handle.
+     * @param <V>      The viewer type.
+     * @param <T>      The item type.
+     * @param <CC>     The click context type.
+     * @param <RC>     The render context type.
+     * @return A new paginated container component configured for synchronous pagination.
+     */
     public static <V, T, CC extends IClickContext<V>, RC extends IRenderContext<V, Void, CC>> PaginatedContainerViewComponent<V, T, CC, RC> sync(
         final int width,
         final int height,
@@ -189,6 +270,22 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         return new PaginatedContainerViewComponent<>(width, height, loader, renderer, handle);
     }
 
+    /**
+     * Creates a paginated container where items are loaded on-demand and asynchronously.
+     *
+     * @param width              The number of columns in the container.
+     * @param height             The number of rows in the container.
+     * @param asyncLoader        A function that loads a page of items asynchronously,
+     * returning a {@code CompletableFuture}.
+     * @param totalPagesSupplier A function that provides the total number of pages.
+     * @param renderer           The renderer for individual items.
+     * @param handle             The ref that will receive the pagination handle.
+     * @param <V>                The viewer type.
+     * @param <T>                The item type.
+     * @param <CC>               The click context type.
+     * @param <RC>               The render context type.
+     * @return A new paginated container component configured for asynchronous pagination.
+     */
     public static <V, T, CC extends IClickContext<V>, RC extends IRenderContext<V, Void, CC>> PaginatedContainerViewComponent<V, T, CC, RC> async(
         final int width,
         final int height,

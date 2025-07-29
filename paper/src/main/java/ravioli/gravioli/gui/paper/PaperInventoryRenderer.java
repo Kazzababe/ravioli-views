@@ -25,6 +25,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Paper/Spigot-specific implementation of the inventory renderer.
+ * This class handles the creation and management of Bukkit inventories
+ * for displaying GUI views to players.
+ *
+ * @param <D> the type of data/props passed to views
+ */
 public final class PaperInventoryRenderer<D> extends AbstractInventoryRenderer<Player, D, ItemStack, View<D>> {
     private static final NamespacedKey VIEW_ITEM_KEY = new NamespacedKey("ravioli-views", "view-item");
 
@@ -35,10 +42,25 @@ public final class PaperInventoryRenderer<D> extends AbstractInventoryRenderer<P
 
     private ViewSession<D> session;
 
+    /**
+     * Creates a new PaperInventoryRenderer for the specified plugin.
+     *
+     * @param plugin the plugin instance that owns this renderer
+     */
     PaperInventoryRenderer(@NotNull final Plugin plugin) {
         this.plugin = plugin;
     }
 
+    /**
+     * Mounts a view by creating a Bukkit inventory and opening it for the player.
+     *
+     * @param rootView the root view to mount
+     * @param props optional properties to pass to the view
+     * @param viewer the player who will see the view
+     * @param title the title for the inventory
+     * @param size the size of the inventory (in slots)
+     * @return the created view session
+     */
     @Override
     public @NotNull ViewSession<D> mount(
         @NotNull final View<D> rootView,
@@ -62,6 +84,11 @@ public final class PaperInventoryRenderer<D> extends AbstractInventoryRenderer<P
         return this.session;
     }
 
+    /**
+     * Unmounts a view session by closing the player's inventory.
+     *
+     * @param session the session to unmount
+     */
     @Override
     public void unmount(@NotNull final IViewSession<Player, D> session) {
         super.unmount(session);
@@ -69,6 +96,13 @@ public final class PaperInventoryRenderer<D> extends AbstractInventoryRenderer<P
         this.session.getViewer().closeInventory();
     }
 
+    /**
+     * Sets an item in the inventory at the specified slot.
+     * Adds a unique identifier to the item's persistent data.
+     *
+     * @param slot the slot to set the item in
+     * @param item the item to set
+     */
     @Override
     protected void setItem(final int slot, @NotNull final ItemStack item) {
         if (slot >= this.session.inventory().getSize()) {
@@ -90,11 +124,22 @@ public final class PaperInventoryRenderer<D> extends AbstractInventoryRenderer<P
         );
     }
 
+    /**
+     * Clears an item from the specified slot in the inventory.
+     *
+     * @param slot the slot to clear
+     */
     @Override
     protected void clearItem(final int slot) {
         this.session.inventory().clear(slot);
     }
 
+    /**
+     * Converts a ViewRenderable to a Bukkit ItemStack.
+     *
+     * @param renderable the renderable to convert
+     * @return the converted ItemStack
+     */
     @Override
     protected @NotNull ItemStack toPlatformItem(@NotNull final ViewRenderable renderable) {
         if (renderable instanceof PaperComponents.ItemRenderable(final ItemStack stack)) {
@@ -103,6 +148,12 @@ public final class PaperInventoryRenderer<D> extends AbstractInventoryRenderer<P
         throw new IllegalArgumentException("Unsupported renderable: " + renderable);
     }
 
+    /**
+     * Applies a patch of changes to the inventory.
+     * This method processes the differences and updates the inventory accordingly.
+     *
+     * @param patch the patch containing the changes to apply
+     */
     @SuppressWarnings("unchecked")
     @Override
     public void apply(@NotNull final Patch patch) {
@@ -135,10 +186,20 @@ public final class PaperInventoryRenderer<D> extends AbstractInventoryRenderer<P
         super.apply(new Patch(normal));
     }
 
+    /**
+     * Gets the map of click handlers for each slot.
+     *
+     * @return the click handlers map
+     */
     @NotNull Map<Integer, ClickHandler<Player, ClickContext>> clicks() {
         return this.clickMap;
     }
 
+    /**
+     * Gets the map of renderables for each slot.
+     *
+     * @return the renderables map
+     */
     @NotNull Map<Integer, ViewRenderable> renderables() {
         return this.renderables;
     }

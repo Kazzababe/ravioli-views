@@ -9,15 +9,27 @@ import ravioli.gravioli.gui.paper.context.RenderContext;
 import java.util.List;
 import java.util.function.BiConsumer;
 
+/**
+ * A Paper-specific implementation of the {@link ravioli.gravioli.gui.core.component.PaginatedContainerViewComponent}.
+ * <p>
+ * This component specializes the core paginated container for the Bukkit/Paper environment by setting the viewer
+ * type to {@link Player} and the context types to {@link ClickContext} and {@link RenderContext}.
+ * </p>
+ *
+ * @param <T> The type of the items being paginated.
+ */
 public final class PaginatedContainerViewComponent<T> extends ravioli.gravioli.gui.core.component.PaginatedContainerViewComponent<Player, T, ClickContext, RenderContext<Void>> {
     /**
-     * Creates a paginated container.
+     * Creates a Paper-specific paginated container.
      *
-     * @param width     columns inside the container
-     * @param height    rows inside the container
-     * @param loader    function: (pageIndex, pageSize) -> List<T>  (sync)
-     * @param renderer  maps T -> ViewRenderable
-     * @param handleRef a Ref that will be populated with the Handle
+     * @param width     The number of columns inside the container.
+     * @param height    The number of rows inside the container.
+     * @param loader    A function that accepts a page index and a callback. It should load the
+     * data for the given page and then invoke the callback with the list of
+     * items and the total number of pages.
+     * @param renderer  A function that maps an item of type {@code T} to a {@code ViewRenderable}.
+     * @param handleRef A {@link Ref} that will be populated with the {@link Handle} to allow for
+     * programmatic control of the pagination.
      */
     public PaginatedContainerViewComponent(
         final int width,

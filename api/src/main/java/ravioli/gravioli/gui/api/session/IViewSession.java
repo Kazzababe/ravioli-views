@@ -13,6 +13,7 @@ import java.util.Collection;
  * Provides access to the original View and the associated viewer context.
  *
  * @param <V> type of the viewer (e.g., player, client session, etc.)
+ * @param <D> type of the prop provided to the view/session
  */
 public interface IViewSession<V, D> {
     /**

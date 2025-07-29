@@ -19,6 +19,7 @@ import ravioli.gravioli.gui.api.render.ViewRenderable;
 import ravioli.gravioli.gui.api.schedule.Scheduler;
 import ravioli.gravioli.gui.api.state.Ref;
 import ravioli.gravioli.gui.api.state.State;
+import ravioli.gravioli.gui.api.state.effect.Effect;
 import ravioli.gravioli.gui.core.ViewReconciler;
 import ravioli.gravioli.gui.core.ViewRegistry;
 import ravioli.gravioli.gui.paper.component.container.VirtualContainerViewComponent;
@@ -37,6 +38,13 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 
+/**
+ * Manages view sessions for Paper/Spigot servers.
+ * <p>
+ * This class handles the lifecycle of GUI views, including registration,
+ * opening, closing, and event handling for player interactions.
+ * </p>
+ */
 public final class ViewManager {
     private final Plugin plugin;
     private final ViewRegistry viewRegistry;
@@ -44,16 +52,31 @@ public final class ViewManager {
 
     private final Map<UUID, ViewSession<?>> sessions = new HashMap<>();
 
+    /**
+     * Creates a new ViewManager for the specified plugin.
+     *
+     * @param plugin The plugin instance that owns this ViewManager.
+     */
     public ViewManager(@NotNull final Plugin plugin) {
         this.plugin = plugin;
         this.viewRegistry = new ViewRegistry();
         this.scheduler = new PaperScheduler(plugin);
     }
 
+    /**
+     * Registers the event listeners for this ViewManager.
+     * This method must be called to enable view functionality.
+     */
     public void register() {
         Bukkit.getPluginManager().registerEvents(new ViewListeners(), this.plugin);
     }
 
+    /**
+     * Registers a view class for later use.
+     * Registered views can be opened using {@link #openView(Class, Player)}.
+     *
+     * @param view The view to register.
+     */
     public void registerView(@NotNull final View<?> view) {
         this.viewRegistry.registerView(view);
     }
@@ -61,9 +84,9 @@ public final class ViewManager {
     /**
      * Checks whether a view of the given type is currently open for the specified player.
      *
-     * @param player    the player to check
-     * @param viewClass the view class to look for
-     * @return {@code true} if that view is open for the player; {@code false} otherwise
+     * @param player    The player to check.
+     * @param viewClass The view class to look for.
+     * @return {@code true} if that view is open for the player; {@code false} otherwise.
      */
     public boolean isOpen(@NotNull final Player player, @NotNull final Class<? extends View<?>> viewClass) {
         final ViewSession<?> session = this.sessions.get(player.getUniqueId());
@@ -77,8 +100,8 @@ public final class ViewManager {
     /**
      * Checks whether any player currently has a view of the given type open.
      *
-     * @param viewClass the view class to look for
-     * @return {@code true} if any session’s root view matches; {@code false} otherwise
+     * @param viewClass The view class to look for.
+     * @return {@code true} if any session's root view matches; {@code false} otherwise.
      */
     public boolean isOpen(@NotNull final Class<? extends View<?>> viewClass) {
         return this.sessions
@@ -90,9 +113,10 @@ public final class ViewManager {
     /**
      * Opens a registered view for the given player without any props.
      *
-     * @param viewClass the view class to open
-     * @param player    the player who will see the view
-     * @throws IllegalArgumentException if the view class is not registered
+     * @param viewClass The class of the view to open.
+     * @param player    The player who will see the view.
+     * @param <T>       The type of the view.
+     * @throws IllegalArgumentException If the view class is not registered.
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public <T extends View<?>> void openView(
@@ -105,10 +129,12 @@ public final class ViewManager {
     /**
      * Opens a registered view for the given player, passing in optional props.
      *
-     * @param viewClass the view class to open
-     * @param player    the player who will see the view
-     * @param props     optional view-specific properties; may be {@code null}
-     * @throws IllegalArgumentException if the view class is not registered
+     * @param viewClass The class of the view to open.
+     * @param player    The player who will see the view.
+     * @param props     Optional view-specific properties; may be {@code null}.
+     * @param <T>       The type of the view.
+     * @param <D>       The type of the props.
+     * @throws IllegalArgumentException If the view class is not registered.
      */
     public <T extends View<D>, D> void openView(
         @NotNull final Class<T> viewClass,
@@ -134,6 +160,7 @@ public final class ViewManager {
                     @NotNull final Map<Integer, ClickHandler<Player, ClickContext>> clicks,
                     @NotNull final Map<String, List<State<?>>> stateMap,
                     @NotNull final Map<String, List<Ref<?>>> refMap,
+                    @NotNull final Map<String, List<Effect>> effectMap,
                     @NotNull final Set<String> visited,
                     @NotNull final Runnable requestUpdateFn
                 ) {
@@ -184,6 +211,7 @@ public final class ViewManager {
                         clicks,
                         stateMap,
                         refMap,
+                        effectMap,
                         visited,
                         requestUpdateFn,
                         session.inventory()
@@ -198,8 +226,17 @@ public final class ViewManager {
         this.sessions.put(player.getUniqueId(), session);
     }
 
+    /**
+     * Internal event listener class for handling inventory and player events
+     * related to managed views.
+     */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private final class ViewListeners implements Listener {
+        /**
+         * Handles clicks inside a managed view inventory.
+         *
+         * @param event The inventory click event.
+         */
         @EventHandler
         private void onClick(@NotNull final InventoryClickEvent event) {
             if (!(event.getWhoClicked() instanceof final Player player)) {
@@ -240,6 +277,11 @@ public final class ViewManager {
             }
         }
 
+        /**
+         * Handles item drags inside a managed view inventory.
+         *
+         * @param event The inventory drag event.
+         */
         @EventHandler
         private void onDrag(@NotNull final InventoryDragEvent event) {
             if (!(event.getWhoClicked() instanceof final Player player)) {
@@ -278,6 +320,11 @@ public final class ViewManager {
             }
         }
 
+        /**
+         * Handles the closing of a managed view inventory.
+         *
+         * @param event The inventory close event.
+         */
         @EventHandler
         private void onClose(@NotNull final InventoryCloseEvent event) {
             if (!(event.getPlayer() instanceof final Player player)) {
@@ -296,6 +343,11 @@ public final class ViewManager {
             session.renderer().unmount(session);
         }
 
+        /**
+         * Handles a player quitting, cleaning up their active view session.
+         *
+         * @param event The player quit event.
+         */
         @EventHandler
         private void onPlayerQuit(@NotNull final PlayerQuitEvent event) {
             final Player player = event.getPlayer();

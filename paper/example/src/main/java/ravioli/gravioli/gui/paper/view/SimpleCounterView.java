@@ -7,10 +7,12 @@ import org.bukkit.Sound;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import ravioli.gravioli.gui.api.state.State;
+import ravioli.gravioli.gui.core.hooks.Hooks;
 import ravioli.gravioli.gui.paper.PaperComponents;
 import ravioli.gravioli.gui.paper.context.InitContext;
 import ravioli.gravioli.gui.paper.context.RenderContext;
 
+import java.time.Duration;
 import java.util.List;
 
 public final class SimpleCounterView extends ProplessView {
@@ -25,6 +27,8 @@ public final class SimpleCounterView extends ProplessView {
         final State<Integer> count = context.useState(0);
         final ItemStack itemStack = new ItemStack(Material.DIAMOND);
 
+        final Hooks.Cooldown cooldown = Hooks.useCooldown(context, Duration.ofSeconds(3));
+
         itemStack.editMeta((itemMeta) -> {
             itemMeta.displayName(
                 Component.text("You've clicked the diamond " + count.get() + " times.")
@@ -37,6 +41,12 @@ public final class SimpleCounterView extends ProplessView {
         });
 
         context.set(0, PaperComponents.item(itemStack), () -> {
+            if (!cooldown.isReady()) {
+                context.getViewer().sendMessage("Cooldown is not ready!");
+
+                return;
+            }
+            cooldown.trigger();
             count.set(count.get() + 1);
 
             context.getViewer().playSound(

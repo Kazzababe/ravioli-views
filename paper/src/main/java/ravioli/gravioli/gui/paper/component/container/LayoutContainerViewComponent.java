@@ -6,28 +6,34 @@ import ravioli.gravioli.gui.paper.context.ClickContext;
 import ravioli.gravioli.gui.paper.context.RenderContext;
 
 /**
- * A container that paints its children from a character-mask.
- *
- * <pre>
- * new LayoutContainerViewComponent&lt;&gt;(
- *     " AAAAA ",
- *     " B   B ",
- *     " B   B ",
- *     " AAAAA ")
- * .map('A', b -&gt; b.item(borderItem))
- * .map('B', b -&gt; b.item(dynamic(idx)).onClick(ctx -&gt; openSub(ctx.getViewer())));
- * </pre>
+ * A Paper-specific container that paints its children based on a character-based mask.
  * <p>
- * • Every distinct character is a logical “channel”.
- * • {@link #map(char, SlotConfigurer)} lets you declaratively describe what
- * happens in each occurrence without an explicit <code>build()</code>.
+ * This component allows for designing complex layouts declaratively using strings.
+ * Every distinct character in the mask represents a logical "channel" that can be
+ * mapped to a specific item or component configuration.
+ * </p>
+ * <p><b>Usage:</b></p>
+ * <pre>{@code
+ * new LayoutContainerViewComponent(
+ * " AAAAA ",
+ * " B   B ",
+ * " B   B ",
+ * " AAAAA ")
+ * .map('A', slot -> slot.item(borderItem))
+ * .map('B', slot -> slot.item(createDynamicItem()).onClick(ctx -> openSubMenu(ctx.getViewer())));
+ * }</pre>
  */
 public final class LayoutContainerViewComponent extends ravioli.gravioli.gui.core.component.LayoutContainerViewComponent<
     Player,
     ClickContext,
     RenderContext<Void>,
     LayoutContainerViewComponent
-> {
+    > {
+    /**
+     * Creates a new layout container with the given string mask.
+     *
+     * @param mask One or more strings representing the rows of the layout.
+     */
     public LayoutContainerViewComponent(@NotNull final String... mask) {
         super(mask);
     }

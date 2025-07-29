@@ -12,6 +12,10 @@ import ravioli.gravioli.gui.api.context.IRenderContext;
  *
  * @param <V> type of the viewer (for example, a player or UI client)
  * @param <D> type of optional properties passed into the view during initialization
+ * @param <CC> type of the click context
+ * @param <EC> type of the close context (exit context)
+ * @param <IC> type of the init context
+ * @param <RC> type of the render context
  */
 public abstract class IView<
     V,
@@ -21,6 +25,12 @@ public abstract class IView<
     IC extends IInitContext<V, D>,
     RC extends IRenderContext<V, D, CC>
 > {
+    /**
+     * Default constructor for IView.
+     */
+    public IView() {
+        // Default constructor
+    }
     /**
      * Called once before the first render. Allows the view to configure
      * container size, title, and read any incoming props.

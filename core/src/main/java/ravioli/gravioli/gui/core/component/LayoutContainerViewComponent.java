@@ -26,21 +26,59 @@ import java.util.Map;
  * .map('B', b -&gt; b.item(dynamic(idx)).onClick(ctx -&gt; openSub(ctx.getViewer())));
  * </pre>
  * <p>
- * • Every distinct character is a logical “channel”.
+ * • Every distinct character is a logical "channel".
  * • {@link #map(char, SlotConfigurer)} lets you declaratively describe what
  * happens in each occurrence without an explicit <code>build()</code>.
  *
  * @param <V> viewer type (e.g., Player)
+ * @param <CC> click context type
+ * @param <RC> render context type
+ * @param <S> self-referencing type for method chaining
  */
 public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC extends IRenderContext<V, Void, CC>, S extends LayoutContainerViewComponent<V, CC, RC, S>> extends IViewComponent<V, Void, RC> {
+    
+    /**
+     * Builder interface for configuring individual slots in the layout.
+     * Provides fluent API for setting items and click handlers.
+     *
+     * @param <V> viewer type
+     * @param <C> click context type
+     */
     public interface SlotBuilder<V, C extends IClickContext<V>> {
+        /**
+         * Sets the renderable item for this slot.
+         *
+         * @param renderable the item to render in this slot
+         * @return this builder for method chaining
+         */
         @NotNull SlotBuilder<V, C> item(@NotNull ViewRenderable renderable);
 
+        /**
+         * Sets the click handler for this slot.
+         *
+         * @param clickHandler the click handler to execute when this slot is clicked, or null for no handler
+         * @return this builder for method chaining
+         */
         @NotNull SlotBuilder<V, C> onClick(@Nullable ClickHandler<V, C> clickHandler);
     }
 
+    /**
+     * Functional interface for configuring slots based on their position and index.
+     * Called for each occurrence of a character in the layout mask.
+     *
+     * @param <V> viewer type
+     * @param <C> click context type
+     */
     @FunctionalInterface
     public interface SlotConfigurer<V, C extends IClickContext<V>> {
+        /**
+         * Configures a slot at the given position and index.
+         *
+         * @param index the occurrence index of this character (0-based)
+         * @param x the x-coordinate of this slot
+         * @param y the y-coordinate of this slot
+         * @param builder the builder to configure the slot
+         */
         void configure(
             int index,
             int x,
@@ -52,6 +90,13 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
     private final String[] mask;
     private final Map<Character, List<SlotConfigurer<V, CC>>> configurers = new HashMap<>();
 
+    /**
+     * Creates a new layout container with the specified character mask.
+     * Each string in the mask represents a row, and all rows must have the same length.
+     *
+     * @param mask the character mask defining the layout structure
+     * @throws IllegalArgumentException if mask is empty or rows have different lengths
+     */
     public LayoutContainerViewComponent(@NotNull final String... mask) {
         if (mask.length == 0) {
             throw new IllegalArgumentException("mask must contain rows");
@@ -66,10 +111,27 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
         this.mask = mask.clone();
     }
 
+    /**
+     * Maps a character to a static renderable item.
+     * All occurrences of the character will render the same item.
+     *
+     * @param ch the character to map
+     * @param renderable the item to render for all occurrences of the character
+     * @return this container for method chaining
+     */
     public final S map(final char ch, @NotNull final ViewRenderable renderable) {
         return this.map(ch, (i, x, y, builder) -> builder.item(renderable));
     }
 
+    /**
+     * Maps a character to a renderable item with a click handler.
+     * All occurrences of the character will render the same item and execute the same click handler.
+     *
+     * @param ch the character to map
+     * @param renderable the item to render for all occurrences of the character
+     * @param click the click handler to execute when any occurrence is clicked
+     * @return this container for method chaining
+     */
     public final S map(
         final char ch,
         @NotNull final ViewRenderable renderable,
@@ -81,6 +143,15 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
         );
     }
 
+    /**
+     * Maps a character to a renderable item with a simple runnable click handler.
+     * All occurrences of the character will render the same item and execute the same action.
+     *
+     * @param ch the character to map
+     * @param renderable the item to render for all occurrences of the character
+     * @param click the action to execute when any occurrence is clicked
+     * @return this container for method chaining
+     */
     public final S map(
         final char ch,
         @NotNull final ViewRenderable renderable,
@@ -92,6 +163,14 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
         );
     }
 
+    /**
+     * Maps a character to a configurer that can customize each occurrence individually.
+     * The configurer receives the index, position, and a builder for each occurrence.
+     *
+     * @param ch the character to map
+     * @param configurer the configurer that will be called for each occurrence of the character
+     * @return this container for method chaining
+     */
     @SuppressWarnings("unchecked")
     public final S map(
         final char ch,
@@ -102,6 +181,12 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
         return (S) this;
     }
 
+    /**
+     * Renders the layout by processing each character in the mask and applying
+     * the configured renderables and click handlers to the appropriate slots.
+     *
+     * @param context the render context to use for rendering
+     */
     @Override
     public void render(@NotNull final RC context) {
         final Map<Character, Integer> counters = new HashMap<>();
@@ -126,6 +211,12 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
         }
     }
 
+    /**
+     * Implementation of SlotBuilder that applies configurations to the render context.
+     *
+     * @param <V> viewer type
+     * @param <C> click context type
+     */
     private static final class BuilderImpl<V, C extends IClickContext<V>> implements SlotBuilder<V, C> {
         private final IRenderContext<V, Void, C> context;
         private final int x;
@@ -133,6 +224,13 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
         private ViewRenderable renderable;
         private ClickHandler<V, C> click;
 
+        /**
+         * Creates a new builder for the specified position.
+         *
+         * @param context the render context to apply configurations to
+         * @param x the x-coordinate of the slot
+         * @param y the y-coordinate of the slot
+         */
         BuilderImpl(@NotNull final IRenderContext<V, Void, C> context, final int x, final int y) {
             this.context = context;
             this.x = x;
@@ -155,6 +253,10 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
             return this;
         }
 
+        /**
+         * Applies the current configuration to the render context.
+         * Called whenever the item or click handler is set.
+         */
         private void flush() {
             if (this.renderable == null) {
                 return;
@@ -167,11 +269,21 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
         }
     }
 
+    /**
+     * Returns the width of the layout (number of columns).
+     *
+     * @return the width of the layout
+     */
     @Override
     public int getWidth() {
         return this.mask[0].length();
     }
 
+    /**
+     * Returns the height of the layout (number of rows).
+     *
+     * @return the height of the layout
+     */
     @Override
     public int getHeight() {
         return this.mask.length;

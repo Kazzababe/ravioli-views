@@ -6,9 +6,16 @@ import ravioli.gravioli.gui.api.component.IViewComponent;
 import ravioli.gravioli.gui.api.interaction.ClickHandler;
 import ravioli.gravioli.gui.api.render.ViewRenderable;
 import ravioli.gravioli.gui.api.schedule.Scheduler;
+import ravioli.gravioli.gui.api.state.BooleanRef;
+import ravioli.gravioli.gui.api.state.BooleanState;
+import ravioli.gravioli.gui.api.state.IntegerRef;
+import ravioli.gravioli.gui.api.state.IntegerState;
+import ravioli.gravioli.gui.api.state.LongRef;
+import ravioli.gravioli.gui.api.state.LongState;
 import ravioli.gravioli.gui.api.state.Ref;
 import ravioli.gravioli.gui.api.state.State;
 import ravioli.gravioli.gui.api.state.StateSupplier;
+import ravioli.gravioli.gui.api.state.effect.Effect;
 
 import java.util.List;
 import java.util.Map;
@@ -21,15 +28,38 @@ import java.util.function.Supplier;
  *
  * @param <V> type of the viewer (e.g., player, user client, etc.)
  * @param <D> type of the optional properties passed from InitContext
+ * @param <C> type of the click context
  */
 public interface IRenderContext<V, D, C extends IClickContext<V>> {
+
+    /**
+     * Factory for creating new render context instances during a view’s render phase.
+     *
+     * @param <V>  the type of the viewer (e.g., player, client), never {@code null}
+     * @param <D>  the type of the optional properties passed from the init context, may be {@code null}
+     * @param <CC> the type of the click context, never {@code null}
+     * @param <C>  the type of the render context produced, never {@code null}
+     */
     @FunctionalInterface
     interface RenderContextCreator<V, D, CC extends IClickContext<V>, C extends IRenderContext<V, D, CC>> {
+        /**
+         * Create a new render context.
+         *
+         * @param renderables     a map from slot index to {@link ViewRenderable} elements, never {@code null}
+         * @param clicks          a map from slot index to {@link ClickHandler} callbacks, never {@code null}
+         * @param stateMap        a map from state key to list of {@link State} instances, never {@code null}
+         * @param refMap          a map from reference key to list of {@link Ref} instances, never {@code null}
+         * @param effectMap       a map from reference key to list of {@link Effect} instances, never {@code null}
+         * @param visited         the set of visited component keys during this render, never {@code null}
+         * @param requestUpdateFn the callback to request an asynchronous update, never {@code null}
+         * @return a new instance of type {@code C}, never {@code null}
+         */
         @NotNull C create(
             @NotNull Map<Integer, ViewRenderable> renderables,
             @NotNull Map<Integer, ClickHandler<V, CC>> clicks,
             @NotNull Map<String, List<State<?>>> stateMap,
             @NotNull Map<String, List<Ref<?>>> refMap,
+            @NotNull Map<String, List<Effect>> effectMap,
             @NotNull Set<String> visited,
             @NotNull Runnable requestUpdateFn
         );
@@ -58,6 +88,25 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
      */
     @Nullable
     D getProps();
+
+    /**
+     * Executes a side effect function after a render, with cleanup on unmount or dependency change.
+     * <p>
+     * This is the primary hook for interacting with outside systems, setting up listeners,
+     * scheduling tasks, or running any code that needs to happen as a result of a render.
+     * The provided {@code effect} supplier is executed after the current render, and it
+     * **must** return a {@link Runnable} which serves as its cleanup function.
+     * </p>
+     * <p>
+     * The cleanup function is executed just before the effect runs again, or when the
+     * component is unmounted, preventing memory leaks.
+     * </p>
+     *
+     * @param effect       A supplier that runs the effect and returns a {@link Runnable} for cleanup.
+     * @param dependencies A list of values. The effect will re-run if any value in this list changes.
+     * If the list is empty ({@code List.of()}), the effect runs only once on mount.
+     */
+    void useEffect(@NotNull Supplier<@NotNull Runnable> effect, @NotNull List<?> dependencies);
 
     /**
      * Allocates a <em>reference</em> — a piece of mutable data initialized to
@@ -90,6 +139,42 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
      * @return a Ref containing the supplied initial value
      */
     @NotNull <T> Ref<T> useRef(@Nullable T initialValue);
+
+    /**
+     * Allocates an integer <em>reference</em>.
+     * <p>
+     * This is a convenience overload of {@link #useRef(Object)} that returns
+     * the specialized {@link IntegerRef} type.
+     *
+     * @param initialValue value to seed the ref with on first render
+     * @return an {@link IntegerRef} containing the supplied initial value
+     */
+    @NotNull
+    IntegerRef useRef(int initialValue);
+
+    /**
+     * Allocates a long <em>reference</em>.
+     * <p>
+     * This is a convenience overload of {@link #useRef(Object)} that returns
+     * the specialized {@link LongRef} type.
+     *
+     * @param initialValue value to seed the ref with on first render
+     * @return a {@link LongRef} containing the supplied initial value
+     */
+    @NotNull
+    LongRef useRef(long initialValue);
+
+    /**
+     * Allocates a boolean <em>reference</em>.
+     * <p>
+     * This is a convenience overload of {@link #useRef(Object)} that returns
+     * the specialized {@link BooleanRef} type.
+     *
+     * @param initialValue value to seed the ref with on first render
+     * @return a {@link BooleanRef} containing the supplied initial value
+     */
+    @NotNull
+    BooleanRef useRef(boolean initialValue);
 
     /**
      * Variant of {@link #useRef(Object)} where the initial value is computed
@@ -164,6 +249,42 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
     <T> State<T> useState(@NotNull T initialValue);
 
     /**
+     * Creates a piece of synchronous state for a primitive {@code int}.
+     * <p>
+     * This is a convenience overload of {@link #useState(Object)} that returns
+     * the specialized {@link IntegerState} type.
+     *
+     * @param initialValue the initial state value
+     * @return an {@link IntegerState} instance containing the initial value
+     */
+    @NotNull
+    IntegerState useState(int initialValue);
+
+    /**
+     * Creates a piece of synchronous state for a primitive {@code long}.
+     * <p>
+     * This is a convenience overload of {@link #useState(Object)} that returns
+     * the specialized {@link LongState} type.
+     *
+     * @param initialValue the initial state value
+     * @return a {@link LongState} instance containing the initial value
+     */
+    @NotNull
+    LongState useState(long initialValue);
+
+    /**
+     * Creates a piece of synchronous state for a primitive {@code boolean}.
+     * <p>
+     * This is a convenience overload of {@link #useState(Object)} that returns
+     * the specialized {@link BooleanState} type.
+     *
+     * @param initialValue the initial state value
+     * @return a {@link BooleanState} instance containing the initial value
+     */
+    @NotNull
+    BooleanState useState(boolean initialValue);
+
+    /**
      * Creates a piece of synchronous state with a lazily-computed initial value.
      * The supplier is invoked only once on the first render.
      *
@@ -178,13 +299,13 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
      * Renders a child ViewComponent at the given slot. The component
      * will be invoked with its own RenderContext for nested layout.
      *
-     * @param slot       0-based linear slot index (row-major order)
+     * @param slot      0-based linear slot index (row-major order)
      * @param component child component to render
      * @param <K>       type of props for the nested component
      */
     <K> void set(
-        final int slot,
-        @NotNull final IViewComponent<V, K, ?> component
+        int slot,
+        @NotNull IViewComponent<V, K, ?> component
     );
 
     /**
@@ -201,7 +322,7 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
         final int y,
         @NotNull final IViewComponent<V, K, ?> component
     ) {
-        this.set(x, y, component, (K) null);
+        this.set(x, y, component, null);
     }
 
     /**
@@ -214,10 +335,10 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
      * @param <K>       type of props
      */
     <K> void set(
-        final int x,
-        final int y,
-        @NotNull final IViewComponent<V, K, ?> component,
-        @Nullable final K props
+        int x,
+        int y,
+        @NotNull IViewComponent<V, K, ?> component,
+        @Nullable K props
     );
 
     /**
@@ -228,9 +349,9 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
      * @param renderable renderable element to display
      */
     void set(
-        final int x,
-        final int y,
-        @NotNull final ViewRenderable renderable
+        int x,
+        int y,
+        @NotNull ViewRenderable renderable
     );
 
     /**
@@ -242,10 +363,10 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
      * @param clickHandler callback invoked on click
      */
     void set(
-        final int x,
-        final int y,
-        @NotNull final ViewRenderable renderable,
-        @NotNull final ClickHandler<V, C> clickHandler
+        int x,
+        int y,
+        @NotNull ViewRenderable renderable,
+        @NotNull ClickHandler<V, C> clickHandler
     );
 
     /**
@@ -272,8 +393,8 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
      * @param renderable renderable element to display
      */
     void set(
-        final int slot,
-        @NotNull final ViewRenderable renderable
+        int slot,
+        @NotNull ViewRenderable renderable
     );
 
     /**
@@ -284,9 +405,9 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
      * @param clickHandler callback invoked on click
      */
     void set(
-        final int slot,
-        @NotNull final ViewRenderable renderable,
-        @NotNull final ClickHandler<V, C> clickHandler
+        int slot,
+        @NotNull ViewRenderable renderable,
+        @NotNull ClickHandler<V, C> clickHandler
     );
 
     /**
@@ -309,8 +430,10 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
      * inside the scope are coalesced — only one render is triggered when the
      * outer-most batch completes.
      * May be nested; only the outer batch actually flushes.
+     *
+     * @param work the runnable containing the batching statements to execute
      */
-    void batch(@NotNull  Runnable work);
+    void batch(@NotNull Runnable work);
 
     /**
      * Returns the X origin offset for nested grid rendering.

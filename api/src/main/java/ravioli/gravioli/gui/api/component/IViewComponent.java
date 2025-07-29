@@ -8,10 +8,21 @@ import ravioli.gravioli.gui.api.context.IRenderContext;
  * A reusable building block within a View, capable of rendering nested components
  * or renderables and managing its own state bucket.
  *
+ * <p>This abstract class should be extended to define custom view components.
+ * It provides lifecycle methods for rendering and sizing, and an optional key for stable identity.</p>
+ *
  * @param <V> type of the viewer (e.g., a player or UI client)
  * @param <D> type of optional props supplied when rendering this component
+ * @param <RC> type of the render context
  */
 public abstract class IViewComponent<V, D, RC extends IRenderContext<V, D, ?>> {
+    /**
+     * Default constructor for IViewComponent.
+     */
+    public IViewComponent() {
+        // Default constructor
+    }
+
     /**
      * Defines how this component produces its content each render cycle.
      * Use {@link IRenderContext} to read state, props, viewer, and to place

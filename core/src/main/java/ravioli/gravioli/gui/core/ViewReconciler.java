@@ -10,6 +10,7 @@ import ravioli.gravioli.gui.api.render.ViewRenderable;
 import ravioli.gravioli.gui.api.session.IViewSession;
 import ravioli.gravioli.gui.api.state.Ref;
 import ravioli.gravioli.gui.api.state.State;
+import ravioli.gravioli.gui.api.state.effect.Effect;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -19,6 +20,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+/**
+ * Handles the reconciliation process for GUI views.
+ * This class manages the diffing and patching of view changes, ensuring that
+ * only the necessary updates are applied to the rendered interface.
+ * It tracks state and refs across renders and generates patches for efficient updates.
+ *
+ * @param <V> the viewer type
+ */
 public final class ViewReconciler<V> {
     private final IViewSession<V, ?> instance;
     private final Renderer<V, ?, ?> renderer;
@@ -26,11 +35,19 @@ public final class ViewReconciler<V> {
 
     private final Map<String, List<State<?>>> stateMap = new HashMap<>();
     private final Map<String, List<Ref<?>>> refMap = new HashMap<>();
+    private final Map<String, List<Effect>> effectMap = new HashMap<>();
     private final Map<Integer, ViewRenderable> prevItems = new HashMap<>();
     private final Map<Integer, ClickHandler<V, ?>> prevClicks = new HashMap<>();
 
     private boolean rendering;
 
+    /**
+     * Creates a new ViewReconciler for the specified view session.
+     *
+     * @param renderContextCreator factory for creating render contexts
+     * @param viewInstance the view session to reconcile
+     * @param renderer the renderer to apply patches to
+     */
     public ViewReconciler(
         @NotNull final IRenderContext.RenderContextCreator<V, ?, ?, ?> renderContextCreator,
         @NotNull final IViewSession<V, ?> viewInstance,
@@ -41,6 +58,10 @@ public final class ViewReconciler<V> {
         this.renderer = renderer;
     }
 
+    /**
+     * Initiates a render cycle for the view.
+     * This method prevents recursive rendering and ensures thread safety.
+     */
     public void render() {
         if (this.rendering) {
             return;
@@ -54,6 +75,11 @@ public final class ViewReconciler<V> {
         }
     }
 
+    /**
+     * Performs the actual reconciliation process.
+     * This method renders the view, compares the result with the previous state,
+     * and applies only the necessary changes through patches.
+     */
     @SuppressWarnings({"rawtypes", "unchecked"})
     public void doRender() {
         final Map<Integer, ViewRenderable> nextItems = new HashMap<>();
@@ -65,6 +91,7 @@ public final class ViewReconciler<V> {
             (Map) nextClicks,
             this.stateMap,
             this.refMap,
+            this.effectMap,
             visited,
             this::render
         );
@@ -72,6 +99,7 @@ public final class ViewReconciler<V> {
         ((IView) this.instance.getRoot()).render(renderContext);
         this.stateMap.keySet().retainAll(visited);
         this.refMap.keySet().retainAll(visited);
+        this.effectMap.keySet().retainAll(visited);
 
         final List<Patch.Diff> diffs = new ArrayList<>();
 
