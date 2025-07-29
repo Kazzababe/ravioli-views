@@ -1,5 +1,6 @@
 package ravioli.gravioli.gui.paper.component.container;
 
+import com.google.common.base.Predicates;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -13,6 +14,7 @@ import ravioli.gravioli.gui.paper.component.ViewComponent;
 import ravioli.gravioli.gui.paper.context.RenderContext;
 
 import java.util.Arrays;
+import java.util.function.Predicate;
 
 /**
  * Paper-specific “virtual chest” region: every slot is fully editable by the
@@ -57,8 +59,9 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
     private final int width;
     private final int height;
     private final Ref<Handle> handleRef;
-
     private final ViewRenderable[] backing;
+
+    private Predicate<ItemStack> filter = Predicates.alwaysTrue();
 
     public VirtualContainerViewComponent(final int width, final int height, @NotNull final Ref<Handle> handleRef) {
         if (width <= 0 || height <= 0) {
@@ -69,7 +72,20 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
         this.handleRef = handleRef;
         this.backing = new ViewRenderable[width * height];
 
-        Arrays.fill(this.backing, EditableToken.INSTANCE);
+        Arrays.fill(this.backing, new EditableSlot(this.filter));
+    }
+
+    public @NotNull VirtualContainerViewComponent filter(@NotNull final Predicate<ItemStack> itemStackFilter) {
+        for (int i = 0; i < this.backing.length; i++ ) {
+            final ViewRenderable renderable = this.backing[i];
+
+            if (renderable instanceof EditableSlot(final Predicate<ItemStack> filter1) && filter1.equals(this.filter)) {
+                this.backing[i] = new EditableSlot(itemStackFilter);
+            }
+        }
+        this.filter = itemStackFilter;
+
+        return this;
     }
 
     @Override
@@ -134,7 +150,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
             this.inventory.setItem(this.toRootSlot(slot), item);
 
             VirtualContainerViewComponent.this.backing[slot] = item == null
-                ? EditableToken.INSTANCE
+                ? new EditableSlot(VirtualContainerViewComponent.this.filter)
                 : PaperComponents.item(item);
         }
 
@@ -144,7 +160,6 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
         }
     }
 
-    public enum EditableToken implements ViewRenderable {
-        INSTANCE
-    }
+    public record EditableSlot(@NotNull Predicate<@NotNull ItemStack> filter) implements ViewRenderable
+    {}
 }

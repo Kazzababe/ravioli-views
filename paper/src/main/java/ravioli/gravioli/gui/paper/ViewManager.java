@@ -9,6 +9,7 @@ import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -34,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 public final class ViewManager {
     private final Plugin plugin;
@@ -198,10 +200,6 @@ public final class ViewManager {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private final class ViewListeners implements Listener {
-        private boolean isNotEditable(@NotNull final ViewSession<?> session, final int rawSlot) {
-            return session.renderer().renderables().get(rawSlot) != VirtualContainerViewComponent.EditableToken.INSTANCE;
-        }
-
         @EventHandler
         private void onClick(@NotNull final InventoryClickEvent event) {
             if (!(event.getWhoClicked() instanceof final Player player)) {
@@ -218,17 +216,28 @@ public final class ViewManager {
                 return;
             }
             final int rawSlot = event.getRawSlot();
+            final ViewRenderable renderable = session.renderer().renderables().get(rawSlot);
 
-            if (this.isNotEditable(session, rawSlot)) {
-                event.setCancelled(true);
-            }
-            final ClickHandler<Player, ClickContext> clickHandler = session.renderer().clicks().get(rawSlot);
+            if (renderable instanceof VirtualContainerViewComponent.EditableSlot(final Predicate<ItemStack> filter)) {
+                final ItemStack itemToPlace;
 
-            if (clickHandler == null) {
+                switch (event.getAction()) {
+                    case PLACE_ALL, PLACE_SOME, PLACE_ONE -> itemToPlace = event.getCursor();
+                    case MOVE_TO_OTHER_INVENTORY -> itemToPlace = event.getCurrentItem();
+                    default -> itemToPlace = null;
+                }
+                if (itemToPlace != null && !itemToPlace.getType().isAir() && !filter.test(itemToPlace)) {
+                    event.setCancelled(true);
+                }
                 return;
             }
             event.setCancelled(true);
-            clickHandler.accept(new ClickContext(player, event));
+
+            final ClickHandler<Player, ClickContext> clickHandler = session.renderer().clicks().get(rawSlot);
+
+            if (clickHandler != null) {
+                clickHandler.accept(new ClickContext(player, event));
+            }
         }
 
         @EventHandler
@@ -246,12 +255,26 @@ public final class ViewManager {
             if (topInventory != session.inventory()) {
                 return;
             }
-            final boolean touchesBlockedSlot = event.getRawSlots()
-                .stream()
-                .anyMatch((slot) -> this.isNotEditable(session, slot));
+            final ItemStack draggedItem = event.getOldCursor();
 
-            if (touchesBlockedSlot) {
-                event.setCancelled(true);
+            if (draggedItem == null || draggedItem.getType().isAir()) {
+                return;
+            }
+            for (final int rawSlot : event.getRawSlots()) {
+                if (rawSlot >= topInventory.getSize()) {
+                    continue;
+                }
+                final ViewRenderable renderable = session.renderer().renderables().get(rawSlot);
+
+                if (renderable instanceof VirtualContainerViewComponent.EditableSlot(
+                    final Predicate<ItemStack> filter
+                )) {
+                    if (!filter.test(draggedItem)) {
+                        event.setCancelled(true);
+                    }
+                } else {
+                    event.setCancelled(true);
+                }
             }
         }
 

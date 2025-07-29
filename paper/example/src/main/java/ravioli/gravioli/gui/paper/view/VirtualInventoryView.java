@@ -15,15 +15,15 @@ public final class VirtualInventoryView extends ProplessView {
     @Override
     public void init(@NotNull final InitContext<Void> context) {
         context.size(3);
-        context.title("Virtual Inventory");
+        context.title("Virtual Inventory (Grass Only)");
     }
 
     @Override
     public void render(@NotNull final RenderContext<Void> context) {
-        final Ref<VirtualContainerViewComponent.Handle> virtualContainer = new Ref<>(null);
+        final Ref<VirtualContainerViewComponent.Handle> virtualContainer = context.useRef();
 
         context.set(
-            1,
+            0,
             new LayoutContainerViewComponent("XXXXXXXXX", "X       X", "XXXXXXXXX")
                 .map('X', item(new ItemStack(Material.GRAY_STAINED_GLASS_PANE)), () -> {
                     context.getViewer().sendMessage(
@@ -31,8 +31,11 @@ public final class VirtualInventoryView extends ProplessView {
                     );
                 })
         );
-        context.set(1, 1, new VirtualContainerViewComponent(7, 1, virtualContainer));
+        context.set(
+            1,
+            1,
+            new VirtualContainerViewComponent(7, 1, virtualContainer)
+                .filter((item) -> item.getType() == Material.GRASS_BLOCK)
+        );
     }
-
-
 }

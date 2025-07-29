@@ -109,22 +109,13 @@ public final class PaperInventoryRenderer<D> extends AbstractInventoryRenderer<P
         final List<Patch.Diff> normal = new ArrayList<>();
 
         for (final Patch.Diff diff : patch.diffs()) {
-            if (
-                diff instanceof Patch.Set(final int slot, final ViewRenderable renderable, final ClickHandler<?, ?> click)
-                    && renderable == VirtualContainerViewComponent.EditableToken.INSTANCE
-            ) {
-                if (click != null) {
-                    this.clickMap.put(slot, (ClickHandler<Player, ClickContext>) click);
-                } else {
+            if (diff instanceof Patch.Set(final int slot, final ViewRenderable renderable, final ClickHandler<?, ?> click)) {
+                if (renderable instanceof VirtualContainerViewComponent.EditableSlot) {
+                    this.renderables.put(slot, renderable);
                     this.clickMap.remove(slot);
-                }
-                this.renderables.put(slot, VirtualContainerViewComponent.EditableToken.INSTANCE);
 
-                continue;
-            }
-            if (diff instanceof Patch.Set(
-                final int slot, final ViewRenderable renderable, final ClickHandler<?, ?> click
-            )) {
+                    continue;
+                }
                 this.renderables.put(slot, renderable);
 
                 if (click != null) {
@@ -132,7 +123,6 @@ public final class PaperInventoryRenderer<D> extends AbstractInventoryRenderer<P
                 } else {
                     this.clickMap.remove(slot);
                 }
-
             } else if (diff instanceof Patch.Clear(final int slot)) {
                 this.renderables.remove(slot);
                 this.clickMap.remove(slot);
