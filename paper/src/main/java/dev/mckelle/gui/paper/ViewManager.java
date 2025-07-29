@@ -386,7 +386,7 @@ public final class ViewManager {
             }
             session.getRoot().close(new CloseContext<>(
                 player,
-                null,
+                session.getProps(),
                 session.inventory()
             ));
             session.renderer().unmount(session);
@@ -407,7 +407,7 @@ public final class ViewManager {
             }
             session.getRoot().close(new CloseContext<>(
                 player,
-                null,
+                session.getProps(),
                 session.inventory()
             ));
             session.renderer().unmount(session);

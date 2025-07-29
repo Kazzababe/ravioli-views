@@ -1,3 +1,6 @@
+import io.papermc.paperweight.util.path
+import kotlin.io.path.absolutePathString
+
 plugins {
     `java-library`
     alias(libs.plugins.paperweight)
@@ -21,7 +24,7 @@ tasks {
     }
 
     reobfJar {
-        outputJar.set(file("${layout.buildDirectory}/libs/${project.name}-$version.jar"))
+        outputJar.set(file("${layout.buildDirectory.path.absolutePathString()}/libs/${project.name}-${project.version}.jar"))
     }
 }
 
