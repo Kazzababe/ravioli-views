@@ -36,6 +36,14 @@ public final class VirtualInventoryView extends ProplessView {
             1,
             new VirtualContainerViewComponent(7, 1, virtualContainer)
                 .filter((item) -> item.getType() == Material.GRASS_BLOCK)
+                .onChange((changeEvent) -> {
+                    context.getViewer().sendMessage(
+                        "Virtual container change event: {\"slot\": \"" + changeEvent.slot() +
+                            "\", \"old\":\"" + changeEvent.oldItem() +
+                            "\", \"new\": \"" + changeEvent.newItem() +
+                            "\"}"
+                    );
+                })
         );
     }
 }

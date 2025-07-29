@@ -10,7 +10,7 @@ plugins {
 
 allprojects {
     group = "dev.mckelle"
-    version = "1.0.0"
+    version = "1.0.1"
 }
 
 val projectName = "Ravioli Views"
@@ -112,8 +112,6 @@ jreleaser {
 
     release {
         github {
-            enabled.set(false)
-
             repoOwner.set(authorAlias)
             tagName.set("v${project.version}")
             releaseName.set("Ravioli Views ${project.version}")

@@ -1,5 +1,5 @@
 name: ravioli-ui-examples
-main: ravioli.gravioli.gui.paper.ExamplePaperPlugin
+main: dev.mckelle.gui.paper.ExamplePaperPlugin
 version: 1.0
 api-version: '1.21'
 

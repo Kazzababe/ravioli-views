@@ -15,6 +15,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -79,8 +80,9 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
      * A {@link ViewRenderable} that represents an empty, editable slot in a virtual container.
      *
      * @param filter A predicate that determines which {@link ItemStack}s are allowed to be placed in this slot.
+     * @param onChange A callback to be executed when the content of this slot changes.
      */
-    public record EditableSlot(@NotNull Predicate<@NotNull ItemStack> filter) implements ViewRenderable {}
+    public record EditableSlot(@NotNull Predicate<@NotNull ItemStack> filter, @Nullable Consumer<ChangeEvent> onChange) implements ViewRenderable {}
 
     private final int width;
     private final int height;
@@ -88,6 +90,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
     private final ViewRenderable[] backing;
     private final ViewRenderable[] initialItems;
     private Predicate<ItemStack> filter = Predicates.alwaysTrue();
+    private Consumer<ChangeEvent> onChange = null;
 
     /**
      * Creates a new virtual container component.
@@ -107,7 +110,26 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
         this.backing = new ViewRenderable[width * height];
         this.initialItems = new ViewRenderable[width * height];
 
-        Arrays.fill(this.backing, new EditableSlot(this.filter));
+        Arrays.fill(this.backing, new EditableSlot(this.filter, this.onChange));
+    }
+
+    /**
+     * Sets a callback to be executed whenever a player successfully modifies an item in any slot.
+     *
+     * @param onChange The callback to run, providing details about the change.
+     * @return This component instance for method chaining.
+     */
+    public @NotNull VirtualContainerViewComponent onChange(@NotNull final Consumer<ChangeEvent> onChange) {
+        this.onChange = onChange;
+
+        for (int i = 0; i < this.backing.length; i++) {
+            final ViewRenderable renderable = this.backing[i];
+
+            if (renderable instanceof final EditableSlot editableSlot) {
+                this.backing[i] = new EditableSlot(editableSlot.filter, this.onChange);
+            }
+        }
+        return this;
     }
 
     /**
@@ -120,8 +142,8 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
         for (int i = 0; i < this.backing.length; i++) {
             final ViewRenderable renderable = this.backing[i];
 
-            if (renderable instanceof EditableSlot(final Predicate<ItemStack> filter1) && filter1.equals(this.filter)) {
-                this.backing[i] = new EditableSlot(itemStackFilter);
+            if (renderable instanceof final EditableSlot editableSlot && editableSlot.filter.equals(this.filter)) {
+                this.backing[i] = new EditableSlot(itemStackFilter, this.onChange);
             }
         }
         this.filter = itemStackFilter;
@@ -280,7 +302,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
             this.inventory.setItem(this.toRootSlot(slot), item);
 
             VirtualContainerViewComponent.this.backing[slot] = item == null
-                ? new EditableSlot(VirtualContainerViewComponent.this.filter)
+                ? new EditableSlot(VirtualContainerViewComponent.this.filter, VirtualContainerViewComponent.this.onChange)
                 : PaperComponents.item(item);
         }
 
@@ -291,5 +313,22 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
         public int size() {
             return VirtualContainerViewComponent.this.backing.length;
         }
+    }
+
+    /**
+     * Represents a change event within a VirtualContainer.
+     *
+     * @param player  The player who initiated the change.
+     * @param slot    The slot index within the container that was modified.
+     * @param oldItem The ItemStack that was in the slot before the change.
+     * @param newItem The ItemStack in the slot after the change.
+     */
+    public record ChangeEvent(
+        @NotNull Player player,
+        int slot,
+        @Nullable ItemStack oldItem,
+        @Nullable ItemStack newItem
+    ) {
+
     }
 }

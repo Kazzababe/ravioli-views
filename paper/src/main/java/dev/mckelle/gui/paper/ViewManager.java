@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
@@ -255,7 +256,10 @@ public final class ViewManager {
             final int rawSlot = event.getRawSlot();
             final ViewRenderable renderable = session.renderer().renderables().get(rawSlot);
 
-            if (renderable instanceof VirtualContainerViewComponent.EditableSlot(final Predicate<ItemStack> filter)) {
+            if (renderable instanceof VirtualContainerViewComponent.EditableSlot(
+                final Predicate<ItemStack> filter,
+                final Consumer<VirtualContainerViewComponent.ChangeEvent> onChange
+            )) {
                 final ItemStack itemToPlace;
 
                 switch (event.getAction()) {
@@ -265,6 +269,17 @@ public final class ViewManager {
                 }
                 if (itemToPlace != null && !itemToPlace.getType().isAir() && !filter.test(itemToPlace)) {
                     event.setCancelled(true);
+                }
+                if (!event.isCancelled() && onChange != null) {
+                    final ItemStack oldItem = event.getCurrentItem() == null ? null : event.getCurrentItem().clone();
+                    final int containerSlot = event.getSlot();
+
+                    Bukkit.getScheduler().runTask(ViewManager.this.plugin, () -> {
+                        final ItemStack newItem = topInventory.getItem(containerSlot);
+                        final var changeEvent = new VirtualContainerViewComponent.ChangeEvent(player, containerSlot, oldItem, newItem);
+
+                        onChange.accept(changeEvent);
+                    });
                 }
                 return;
             }
@@ -302,22 +317,56 @@ public final class ViewManager {
             if (draggedItem == null || draggedItem.getType().isAir()) {
                 return;
             }
+            final Map<Integer, ItemStack> oldItems = new HashMap<>();
+
             for (final int rawSlot : event.getRawSlots()) {
                 if (rawSlot >= topInventory.getSize()) {
                     continue;
                 }
+                final ItemStack oldItem = topInventory.getItem(rawSlot);
                 final ViewRenderable renderable = session.renderer().renderables().get(rawSlot);
 
-                if (renderable instanceof VirtualContainerViewComponent.EditableSlot(
-                    final Predicate<ItemStack> filter
-                )) {
-                    if (!filter.test(draggedItem)) {
+                oldItems.put(
+                    rawSlot,
+                    oldItem == null ? null : oldItem.clone()
+                );
+
+                if (renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot) {
+                    if (!editableSlot.filter().test(draggedItem)) {
                         event.setCancelled(true);
+
+                        break;
                     }
                 } else {
                     event.setCancelled(true);
+
+                    break;
                 }
             }
+            if (event.isCancelled()) {
+                return;
+            }
+            Bukkit.getScheduler().runTask(ViewManager.this.plugin, () -> {
+                for (final int rawSlot : event.getRawSlots()) {
+                    if (rawSlot >= topInventory.getSize()) {
+                        continue;
+                    }
+                    final ViewRenderable renderable = session.renderer().renderables().get(rawSlot);
+
+                    if (!(renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot) || editableSlot.onChange() == null) {
+                        continue;
+                    }
+                    final ItemStack newItem = topInventory.getItem(rawSlot);
+                    final var changeEvent = new VirtualContainerViewComponent.ChangeEvent(
+                        player,
+                        rawSlot,
+                        oldItems.get(rawSlot),
+                        newItem
+                    );
+
+                    editableSlot.onChange().accept(changeEvent);
+                }
+            });
         }
 
         /**
