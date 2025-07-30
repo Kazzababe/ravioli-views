@@ -22,6 +22,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
@@ -241,7 +242,7 @@ public final class ViewManager {
          *
          * @param event The inventory click event.
          */
-        @EventHandler(priority = EventPriority.MONITOR)
+        @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
         private void onClick(@NotNull final InventoryClickEvent event) {
             if (!(event.getWhoClicked() instanceof final Player player)) {
                 return;
@@ -252,8 +253,89 @@ public final class ViewManager {
                 return;
             }
             final Inventory topInventory = playerSession.session.inventory();
+            final Inventory clickedInventory = event.getClickedInventory();
 
-            if (event.getClickedInventory() != topInventory) {
+            if (event.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY && clickedInventory != null && clickedInventory != topInventory) {
+                final ItemStack originalItem = event.getCurrentItem();
+
+                if (originalItem == null || originalItem.isEmpty()) {
+                    return;
+                }
+                final ItemStack itemToMove = originalItem.clone();
+                VirtualContainerViewComponent.EditableSlot containerProps = null;
+
+                for (final ViewRenderable renderable : playerSession.session.renderer().renderables().values()) {
+                    if (renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot) {
+                        containerProps = editableSlot;
+
+                        break;
+                    }
+                }
+                if (containerProps != null) {
+                    event.setCancelled(true);
+
+                    if (!containerProps.filter().test(itemToMove)) {
+                        return;
+                    }
+                    final Consumer<VirtualContainerViewComponent.ChangeEvent> onChange = containerProps.onChange();
+
+                    for (int i = 0; i < topInventory.getSize(); i++) {
+                        if (itemToMove.getAmount() <= 0) {
+                            break;
+                        }
+                        if (!(playerSession.session.renderer().renderables().get(i) instanceof VirtualContainerViewComponent.EditableSlot)) {
+                            continue;
+                        }
+                        final ItemStack existingItem = topInventory.getItem(i);
+
+                        if (existingItem == null || existingItem.isEmpty() || !existingItem.isSimilar(itemToMove)) {
+                            continue;
+                        }
+                        final int space = existingItem.getMaxStackSize() - existingItem.getAmount();
+
+                        if (space <= 0) {
+                            continue;
+                        }
+                        final int amountToTransfer = Math.min(space, itemToMove.getAmount());
+                        final ItemStack oldItemState = existingItem.clone();
+
+                        existingItem.setAmount(existingItem.getAmount() + amountToTransfer);
+                        itemToMove.setAmount(itemToMove.getAmount() - amountToTransfer);
+
+                        if (onChange != null) {
+                            onChange.accept(new VirtualContainerViewComponent.ChangeEvent(player, i, oldItemState, existingItem.clone()));
+                        }
+                    }
+                    if (itemToMove.getAmount() > 0) {
+                        for (int i = 0; i < topInventory.getSize(); i++) {
+                            if (itemToMove.getAmount() <= 0) {
+                                break;
+                            }
+                            if (!(playerSession.session.renderer().renderables().get(i) instanceof VirtualContainerViewComponent.EditableSlot)) {
+                                continue;
+                            }
+                            final ItemStack topItem = topInventory.getItem(i);
+
+                            if (topItem != null && !topItem.isEmpty()) {
+                                continue;
+                            }
+                            final int amountToTransfer = Math.min(itemToMove.getMaxStackSize(), itemToMove.getAmount());
+                            final ItemStack newItem = itemToMove.clone();
+
+                            newItem.setAmount(amountToTransfer);
+                            topInventory.setItem(i, newItem);
+                            itemToMove.setAmount(itemToMove.getAmount() - amountToTransfer);
+
+                            if (onChange != null) {
+                                onChange.accept(new VirtualContainerViewComponent.ChangeEvent(player, i, null, newItem.clone()));
+                            }
+                        }
+                    }
+                    clickedInventory.setItem(event.getSlot(), itemToMove.getAmount() > 0 ? itemToMove : null);
+                }
+                return;
+            }
+            if (clickedInventory != topInventory) {
                 final Map<Integer, ItemStack> beforeState = new HashMap<>();
 
                 for (int i = 0; i < topInventory.getSize(); i++) {
@@ -269,11 +351,17 @@ public final class ViewManager {
                     }
                     final ViewRenderable renderable = playerSession.session.renderer().renderables().get(slot);
 
-                    if (renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot && editableSlot.onChange() != null) {
-                        final var changeEvent = new VirtualContainerViewComponent.ChangeEvent(player, slot, beforeState.get(slot), afterEntry.getValue());
-
-                        editableSlot.onChange().accept(changeEvent);
+                    if (!(renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot) || editableSlot.onChange() == null) {
+                        continue;
                     }
+                    editableSlot.onChange().accept(
+                        new VirtualContainerViewComponent.ChangeEvent(
+                            player,
+                            slot,
+                            beforeState.get(slot),
+                            afterEntry.getValue()
+                        )
+                    );
                 }
                 return;
             }
@@ -304,11 +392,15 @@ public final class ViewManager {
                         if (Objects.equals(beforeState.get(slot), afterEntry.getValue())) {
                             continue;
                         }
-                        if (onChange != null) {
-                            final var changeEvent = new VirtualContainerViewComponent.ChangeEvent(player, slot, beforeState.get(slot), afterEntry.getValue());
-
-                            onChange.accept(changeEvent);
+                        if (onChange == null) {
+                            continue;
                         }
+                        onChange.accept(new VirtualContainerViewComponent.ChangeEvent(
+                            player,
+                            slot,
+                            beforeState.get(slot),
+                            afterEntry.getValue()
+                        ));
                     }
                 }
             } else {
@@ -327,7 +419,7 @@ public final class ViewManager {
          *
          * @param event The inventory drag event.
          */
-        @EventHandler(priority = EventPriority.MONITOR)
+        @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
         private void onDrag(@NotNull final InventoryDragEvent event) {
             if (!(event.getWhoClicked() instanceof final Player player)) {
                 return;
