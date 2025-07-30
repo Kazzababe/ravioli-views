@@ -15,7 +15,7 @@ import dev.mckelle.gui.paper.context.CloseContext;
 import dev.mckelle.gui.paper.context.InitContext;
 import dev.mckelle.gui.paper.context.PaperRenderContext;
 import dev.mckelle.gui.paper.schedule.PaperScheduler;
-import dev.mckelle.gui.paper.util.SlotOutcomePredictor;
+import dev.mckelle.gui.paper.util.InventoryUtils;
 import dev.mckelle.gui.paper.view.View;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -39,6 +39,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * Manages view sessions for Paper/Spigot servers.
@@ -52,7 +54,7 @@ public final class ViewManager {
     private final ViewRegistry viewRegistry;
     private final Scheduler scheduler;
 
-    private final Map<UUID, ViewSession<?>> sessions = new HashMap<>();
+    private final Map<UUID, PlayerViewSession<?>> sessions = new HashMap<>();
 
     /**
      * Creates a new ViewManager for the specified plugin.
@@ -91,12 +93,12 @@ public final class ViewManager {
      * @return {@code true} if that view is open for the player; {@code false} otherwise.
      */
     public boolean isOpen(@NotNull final Player player, @NotNull final Class<? extends View<?>> viewClass) {
-        final ViewSession<?> session = this.sessions.get(player.getUniqueId());
+        final PlayerViewSession<?> session = this.sessions.get(player.getUniqueId());
 
         if (session == null) {
             return false;
         }
-        return session.getRoot().getClass() == viewClass;
+        return session.session.getRoot().getClass() == viewClass;
     }
 
     /**
@@ -109,7 +111,7 @@ public final class ViewManager {
         return this.sessions
             .values()
             .stream()
-            .anyMatch((session) -> session.getRoot().getClass() == viewClass);
+            .anyMatch((session) -> session.session.getRoot().getClass() == viewClass);
     }
 
     /**
@@ -225,7 +227,7 @@ public final class ViewManager {
         );
 
         reconciler.render();
-        this.sessions.put(player.getUniqueId(), session);
+        this.sessions.put(player.getUniqueId(), new PlayerViewSession<D>(session, reconciler));
     }
 
     /**
@@ -244,56 +246,79 @@ public final class ViewManager {
             if (!(event.getWhoClicked() instanceof final Player player)) {
                 return;
             }
-            final ViewSession<?> session = ViewManager.this.sessions.get(player.getUniqueId());
+            final PlayerViewSession<?> playerSession = ViewManager.this.sessions.get(player.getUniqueId());
 
-            if (session == null) {
+            if (playerSession == null || event.getView().getTopInventory() != playerSession.session.inventory()) {
                 return;
             }
-            final Inventory topInventory = session.inventory();
-            final Map<Integer, ItemStack> beforeState = new HashMap<>();
+            final Inventory topInventory = playerSession.session.inventory();
 
-            for (int i = 0; i < topInventory.getSize(); i++) {
-                beforeState.put(i, SlotOutcomePredictor.cloneOrNull(topInventory.getItem(i)));
-            }
-            final Map<Integer, ItemStack> afterState = SlotOutcomePredictor.predictTopInventoryChanges(event);
+            if (event.getClickedInventory() != topInventory) {
+                final Map<Integer, ItemStack> beforeState = new HashMap<>();
 
-            for (final Map.Entry<Integer, ItemStack> afterEntry : afterState.entrySet()) {
-                final int slot = afterEntry.getKey();
-                final ItemStack oldItem = beforeState.get(slot);
-                final ItemStack newItem = afterEntry.getValue();
+                for (int i = 0; i < topInventory.getSize(); i++) {
+                    beforeState.put(i, InventoryUtils.cloneOrNull(topInventory.getItem(i)));
+                }
+                final Map<Integer, ItemStack> afterState = InventoryUtils.predictTopInventoryChanges(event);
 
-                if (!Objects.equals(oldItem, newItem)) {
-                    final ViewRenderable renderable = session.renderer().renderables().get(slot);
+                for (final Map.Entry<Integer, ItemStack> afterEntry : afterState.entrySet()) {
+                    final int slot = afterEntry.getKey();
+
+                    if (Objects.equals(beforeState.get(slot), afterEntry.getValue())) {
+                        continue;
+                    }
+                    final ViewRenderable renderable = playerSession.session.renderer().renderables().get(slot);
+
                     if (renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot && editableSlot.onChange() != null) {
-                        final var changeEvent = new VirtualContainerViewComponent.ChangeEvent(player, slot, oldItem, newItem);
+                        final var changeEvent = new VirtualContainerViewComponent.ChangeEvent(player, slot, beforeState.get(slot), afterEntry.getValue());
+
                         editableSlot.onChange().accept(changeEvent);
                     }
                 }
-            }
-            if (event.getClickedInventory() != topInventory) {
                 return;
             }
-            final ViewRenderable renderable = session.renderer().renderables().get(event.getRawSlot());
+            final ViewRenderable renderable = playerSession.session.renderer().renderables().get(event.getRawSlot());
 
-            if (!(renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot)) {
-                final ClickHandler<Player, ClickContext> clickHandler = session.renderer().clicks().get(event.getRawSlot());
+            if (renderable instanceof VirtualContainerViewComponent.EditableSlot(
+                final Predicate<ItemStack> filter,
+                final Consumer<VirtualContainerViewComponent.ChangeEvent> onChange
+            )) {
+                final ItemStack itemToPlace;
+
+                switch (event.getAction()) {
+                    case PLACE_ALL, PLACE_SOME, PLACE_ONE -> itemToPlace = event.getCursor();
+                    case MOVE_TO_OTHER_INVENTORY -> itemToPlace = event.getCurrentItem();
+                    default -> itemToPlace = null;
+                }
+                if (itemToPlace == null || itemToPlace.isEmpty() || filter.test(itemToPlace)) {
+                    final Map<Integer, ItemStack> beforeState = new HashMap<>();
+
+                    for (int i = 0; i < topInventory.getSize(); i++) {
+                        beforeState.put(i, InventoryUtils.cloneOrNull(topInventory.getItem(i)));
+                    }
+                    final Map<Integer, ItemStack> afterState = InventoryUtils.predictTopInventoryChanges(event);
+
+                    for (final Map.Entry<Integer, ItemStack> afterEntry : afterState.entrySet()) {
+                        final int slot = afterEntry.getKey();
+
+                        if (Objects.equals(beforeState.get(slot), afterEntry.getValue())) {
+                            continue;
+                        }
+                        if (onChange != null) {
+                            final var changeEvent = new VirtualContainerViewComponent.ChangeEvent(player, slot, beforeState.get(slot), afterEntry.getValue());
+
+                            onChange.accept(changeEvent);
+                        }
+                    }
+                }
+            } else {
+                final ClickHandler<Player, ClickContext> clickHandler = playerSession.session.renderer().clicks().get(event.getRawSlot());
 
                 event.setCancelled(true);
 
                 if (clickHandler != null) {
                     clickHandler.accept(new ClickContext(player, event));
                 }
-                return;
-            }
-            final ItemStack itemToPlace;
-
-            switch (event.getAction()) {
-                case PLACE_ALL, PLACE_SOME, PLACE_ONE -> itemToPlace = event.getCursor();
-                case MOVE_TO_OTHER_INVENTORY -> itemToPlace = event.getCurrentItem();
-                default -> itemToPlace = null;
-            }
-            if (itemToPlace != null && !itemToPlace.getType().isAir() && !editableSlot.filter().test(itemToPlace)) {
-                event.setCancelled(true);
             }
         }
 
@@ -307,19 +332,19 @@ public final class ViewManager {
             if (!(event.getWhoClicked() instanceof final Player player)) {
                 return;
             }
-            final ViewSession<?> session = ViewManager.this.sessions.get(player.getUniqueId());
+            final PlayerViewSession<?> session = ViewManager.this.sessions.get(player.getUniqueId());
 
             if (session == null) {
                 return;
             }
             final Inventory topInventory = event.getView().getTopInventory();
 
-            if (topInventory != session.inventory()) {
+            if (topInventory != session.session.inventory()) {
                 return;
             }
             final ItemStack draggedItem = event.getOldCursor();
 
-            if (draggedItem == null || draggedItem.getType().isAir()) {
+            if (draggedItem.getType().isAir()) {
                 return;
             }
             final Map<Integer, ItemStack> oldItems = new HashMap<>();
@@ -329,7 +354,7 @@ public final class ViewManager {
                     continue;
                 }
                 final ItemStack oldItem = topInventory.getItem(rawSlot);
-                final ViewRenderable renderable = session.renderer().renderables().get(rawSlot);
+                final ViewRenderable renderable = session.session.renderer().renderables().get(rawSlot);
 
                 oldItems.put(
                     rawSlot,
@@ -357,7 +382,7 @@ public final class ViewManager {
                 if (rawSlot >= topInventory.getSize()) {
                     continue;
                 }
-                final ViewRenderable renderable = session.renderer().renderables().get(rawSlot);
+                final ViewRenderable renderable = session.session.renderer().renderables().get(rawSlot);
 
                 if (!(renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot) || editableSlot.onChange() == null) {
                     continue;
@@ -384,17 +409,18 @@ public final class ViewManager {
             if (!(event.getPlayer() instanceof final Player player)) {
                 return;
             }
-            final ViewSession session = ViewManager.this.sessions.remove(player.getUniqueId());
+            final PlayerViewSession session = ViewManager.this.sessions.remove(player.getUniqueId());
 
             if (session == null) {
                 return;
             }
-            session.getRoot().close(new CloseContext<>(
+            session.session.getRoot().close(new CloseContext<>(
                 player,
-                session.getProps(),
-                session.inventory()
+                session.session.getProps(),
+                session.session.inventory()
             ));
-            session.renderer().unmount(session);
+            session.session.renderer().unmount(session.session);
+            session.reconciler.cleanup();
         }
 
         /**
@@ -404,18 +430,23 @@ public final class ViewManager {
          */
         @EventHandler
         private void onPlayerQuit(@NotNull final PlayerQuitEvent event) {
-            final Player player = event.getPlayer();
-            final ViewSession session = ViewManager.this.sessions.remove(player.getUniqueId());
+            final org.bukkit.entity.Player player = event.getPlayer();
+            final PlayerViewSession session = ViewManager.this.sessions.remove(player.getUniqueId());
 
             if (session == null) {
                 return;
             }
-            session.getRoot().close(new CloseContext<>(
+            session.session.getRoot().close(new CloseContext<>(
                 player,
-                session.getProps(),
-                session.inventory()
+                session.session.getProps(),
+                session.session.inventory()
             ));
-            session.renderer().unmount(session);
+            session.session.renderer().unmount(session.session);
+            session.reconciler.cleanup();
         }
+    }
+
+    private record PlayerViewSession<D>(@NotNull ViewSession<D> session, @NotNull ViewReconciler<Player> reconciler) {
+
     }
 }

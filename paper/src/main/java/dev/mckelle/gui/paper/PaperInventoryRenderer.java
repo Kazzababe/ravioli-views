@@ -109,6 +109,7 @@ public final class PaperInventoryRenderer<D> extends AbstractInventoryRenderer<P
             return;
         }
         final ItemStack itemStack = item.clone();
+        final ItemStack currentItem = this.session.inventory().getItem(slot);
 
         itemStack.editMeta((itemMeta) -> {
             itemMeta.getPersistentDataContainer().set(
@@ -118,10 +119,11 @@ public final class PaperInventoryRenderer<D> extends AbstractInventoryRenderer<P
             );
         });
 
-        this.session.inventory().setItem(
-            slot,
-            itemStack
-        );
+        if (currentItem == null || currentItem.getType() != itemStack.getType()) {
+            this.session.inventory().setItem(slot, itemStack);
+        } else {
+            currentItem.setItemMeta(itemStack.getItemMeta());
+        }
     }
 
     /**

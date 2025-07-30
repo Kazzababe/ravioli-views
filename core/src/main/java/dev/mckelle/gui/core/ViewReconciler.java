@@ -38,6 +38,7 @@ public final class ViewReconciler<V> {
     private final Map<String, List<Effect>> effectMap = new HashMap<>();
     private final Map<Integer, ViewRenderable> prevItems = new HashMap<>();
     private final Map<Integer, ClickHandler<V, ?>> prevClicks = new HashMap<>();
+    private final Set<String> prevVisitedKeys = new HashSet<>();
 
     private boolean rendering;
 
@@ -97,6 +98,19 @@ public final class ViewReconciler<V> {
         );
 
         ((IView) this.instance.getRoot()).render(renderContext);
+
+        final Set<String> unmountedKeys = new HashSet<>(this.prevVisitedKeys);
+
+        unmountedKeys.removeAll(visited);
+
+        for (final String unmountedKey : unmountedKeys) {
+            final List<Effect> effectsToClean = this.effectMap.get(unmountedKey);
+
+            if (effectsToClean != null) {
+                // Components don't unmount in the same way a view does, we just call cleanups of the useEffect hook
+                effectsToClean.forEach(Effect::cleanup);
+            }
+        }
         this.stateMap.keySet().retainAll(visited);
         this.refMap.keySet().retainAll(visited);
         this.effectMap.keySet().retainAll(visited);
@@ -104,7 +118,9 @@ public final class ViewReconciler<V> {
         final List<Patch.Diff> diffs = new ArrayList<>();
 
         nextItems.forEach((slot, renderable) -> {
-            if (Objects.equals(this.prevItems.get(slot), renderable)) {
+            final ViewRenderable previousRenderable = this.prevItems.get(slot);
+
+            if (Objects.equals(previousRenderable, renderable)) {
                 return;
             }
             // React mindset would enforce comparing click handlers as well but this would require
@@ -127,5 +143,26 @@ public final class ViewReconciler<V> {
 
         this.prevClicks.clear();
         this.prevClicks.putAll(nextClicks);
+
+        this.prevVisitedKeys.clear();
+        this.prevVisitedKeys.addAll(visited);
+    }
+
+    /**
+     * Forcefully cleans up all tracked effects for the entire view.
+     * <p>
+     * This method should be called when the view session is being completely destroyed
+     * (e.g., when the inventory is closed or the player quits). It ensures that all
+     * effect cleanup functions are run, preventing resource leaks from listeners,
+     * scheduled tasks, or other persistent subscriptions.
+     */
+    public void cleanup() {
+        this.effectMap.values().forEach((effects) -> {
+            effects.forEach((effect) -> {
+                if (effect.cleanup().isPresent()) {
+                    effect.cleanup().get().run();
+                }
+            });
+        });
     }
 }

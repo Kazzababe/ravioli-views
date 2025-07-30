@@ -15,7 +15,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * A utility for deterministically predicting the outcome of an {@link InventoryClickEvent}.
+ * A utility for deterministically predicting the outcome of an {@link InventoryClickEvent} as
+ * well as several methods for item interactions.
  *
  * <p><b>Purpose:</b> This class exists to solve a fundamental problem in creating synchronous,
  * state-driven GUI systems in Bukkit. Standard event handling does not provide the final state
@@ -28,9 +29,9 @@ import java.util.Map;
  * @see #predict(InventoryClickEvent) for predicting a single slot's outcome.
  * @see #predictTopInventoryChanges(InventoryClickEvent) for predicting the state of an entire inventory.
  */
-public final class SlotOutcomePredictor {
+public final class InventoryUtils {
 
-    private SlotOutcomePredictor() {
+    private InventoryUtils() {
     }
 
     /**
@@ -266,7 +267,7 @@ public final class SlotOutcomePredictor {
      * @return A clone of the ItemStack, or {@code null}.
      */
     public static @Nullable ItemStack cloneOrNull(@Nullable final ItemStack original) {
-        return original == null || original.getType().isAir() ? null : original.clone();
+        return original == null || original.isEmpty() ? null : original.clone();
     }
 
     /**
@@ -276,7 +277,7 @@ public final class SlotOutcomePredictor {
      * @param amount The new amount for the cloned stack.
      * @return A new ItemStack with the specified amount.
      */
-    private static @NotNull ItemStack withAmount(@NotNull final ItemStack stack, final int amount) {
+    public static @NotNull ItemStack withAmount(@NotNull final ItemStack stack, final int amount) {
         final ItemStack copy = stack.clone();
 
         copy.setAmount(amount);
