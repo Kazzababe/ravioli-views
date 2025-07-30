@@ -15,10 +15,12 @@ import dev.mckelle.gui.paper.context.CloseContext;
 import dev.mckelle.gui.paper.context.InitContext;
 import dev.mckelle.gui.paper.context.PaperRenderContext;
 import dev.mckelle.gui.paper.schedule.PaperScheduler;
+import dev.mckelle.gui.paper.util.SlotOutcomePredictor;
 import dev.mckelle.gui.paper.view.View;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
@@ -34,10 +36,9 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 /**
  * Manages view sessions for Paper/Spigot servers.
@@ -238,7 +239,7 @@ public final class ViewManager {
          *
          * @param event The inventory click event.
          */
-        @EventHandler
+        @EventHandler(priority = EventPriority.MONITOR)
         private void onClick(@NotNull final InventoryClickEvent event) {
             if (!(event.getWhoClicked() instanceof final Player player)) {
                 return;
@@ -248,47 +249,51 @@ public final class ViewManager {
             if (session == null) {
                 return;
             }
-            final Inventory topInventory = event.getView().getTopInventory();
+            final Inventory topInventory = session.inventory();
+            final Map<Integer, ItemStack> beforeState = new HashMap<>();
 
-            if (topInventory != session.inventory() || event.getClickedInventory() != topInventory) {
+            for (int i = 0; i < topInventory.getSize(); i++) {
+                beforeState.put(i, SlotOutcomePredictor.cloneOrNull(topInventory.getItem(i)));
+            }
+            final Map<Integer, ItemStack> afterState = SlotOutcomePredictor.predictTopInventoryChanges(event);
+
+            for (final Map.Entry<Integer, ItemStack> afterEntry : afterState.entrySet()) {
+                final int slot = afterEntry.getKey();
+                final ItemStack oldItem = beforeState.get(slot);
+                final ItemStack newItem = afterEntry.getValue();
+
+                if (!Objects.equals(oldItem, newItem)) {
+                    final ViewRenderable renderable = session.renderer().renderables().get(slot);
+                    if (renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot && editableSlot.onChange() != null) {
+                        final var changeEvent = new VirtualContainerViewComponent.ChangeEvent(player, slot, oldItem, newItem);
+                        editableSlot.onChange().accept(changeEvent);
+                    }
+                }
+            }
+            if (event.getClickedInventory() != topInventory) {
                 return;
             }
-            final int rawSlot = event.getRawSlot();
-            final ViewRenderable renderable = session.renderer().renderables().get(rawSlot);
+            final ViewRenderable renderable = session.renderer().renderables().get(event.getRawSlot());
 
-            if (renderable instanceof VirtualContainerViewComponent.EditableSlot(
-                final Predicate<ItemStack> filter,
-                final Consumer<VirtualContainerViewComponent.ChangeEvent> onChange
-            )) {
-                final ItemStack itemToPlace;
+            if (!(renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot)) {
+                final ClickHandler<Player, ClickContext> clickHandler = session.renderer().clicks().get(event.getRawSlot());
 
-                switch (event.getAction()) {
-                    case PLACE_ALL, PLACE_SOME, PLACE_ONE -> itemToPlace = event.getCursor();
-                    case MOVE_TO_OTHER_INVENTORY -> itemToPlace = event.getCurrentItem();
-                    default -> itemToPlace = null;
-                }
-                if (itemToPlace != null && !itemToPlace.getType().isAir() && !filter.test(itemToPlace)) {
-                    event.setCancelled(true);
-                }
-                if (!event.isCancelled() && onChange != null) {
-                    final ItemStack oldItem = event.getCurrentItem() == null ? null : event.getCurrentItem().clone();
-                    final int containerSlot = event.getSlot();
+                event.setCancelled(true);
 
-                    Bukkit.getScheduler().runTask(ViewManager.this.plugin, () -> {
-                        final ItemStack newItem = topInventory.getItem(containerSlot);
-                        final var changeEvent = new VirtualContainerViewComponent.ChangeEvent(player, containerSlot, oldItem, newItem);
-
-                        onChange.accept(changeEvent);
-                    });
+                if (clickHandler != null) {
+                    clickHandler.accept(new ClickContext(player, event));
                 }
                 return;
             }
-            event.setCancelled(true);
+            final ItemStack itemToPlace;
 
-            final ClickHandler<Player, ClickContext> clickHandler = session.renderer().clicks().get(rawSlot);
-
-            if (clickHandler != null) {
-                clickHandler.accept(new ClickContext(player, event));
+            switch (event.getAction()) {
+                case PLACE_ALL, PLACE_SOME, PLACE_ONE -> itemToPlace = event.getCursor();
+                case MOVE_TO_OTHER_INVENTORY -> itemToPlace = event.getCurrentItem();
+                default -> itemToPlace = null;
+            }
+            if (itemToPlace != null && !itemToPlace.getType().isAir() && !editableSlot.filter().test(itemToPlace)) {
+                event.setCancelled(true);
             }
         }
 
@@ -297,7 +302,7 @@ public final class ViewManager {
          *
          * @param event The inventory drag event.
          */
-        @EventHandler
+        @EventHandler(priority = EventPriority.MONITOR)
         private void onDrag(@NotNull final InventoryDragEvent event) {
             if (!(event.getWhoClicked() instanceof final Player player)) {
                 return;
@@ -346,27 +351,27 @@ public final class ViewManager {
             if (event.isCancelled()) {
                 return;
             }
-            Bukkit.getScheduler().runTask(ViewManager.this.plugin, () -> {
-                for (final int rawSlot : event.getRawSlots()) {
-                    if (rawSlot >= topInventory.getSize()) {
-                        continue;
-                    }
-                    final ViewRenderable renderable = session.renderer().renderables().get(rawSlot);
+            final Map<Integer, ItemStack> newItems = event.getNewItems();
 
-                    if (!(renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot) || editableSlot.onChange() == null) {
-                        continue;
-                    }
-                    final ItemStack newItem = topInventory.getItem(rawSlot);
-                    final var changeEvent = new VirtualContainerViewComponent.ChangeEvent(
-                        player,
-                        rawSlot,
-                        oldItems.get(rawSlot),
-                        newItem
-                    );
-
-                    editableSlot.onChange().accept(changeEvent);
+            for (final int rawSlot : event.getRawSlots()) {
+                if (rawSlot >= topInventory.getSize()) {
+                    continue;
                 }
-            });
+                final ViewRenderable renderable = session.renderer().renderables().get(rawSlot);
+
+                if (!(renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot) || editableSlot.onChange() == null) {
+                    continue;
+                }
+                final ItemStack newItem = newItems.get(rawSlot);
+                final var changeEvent = new VirtualContainerViewComponent.ChangeEvent(
+                    player,
+                    rawSlot,
+                    oldItems.get(rawSlot),
+                    newItem
+                );
+
+                editableSlot.onChange().accept(changeEvent);
+            }
         }
 
         /**

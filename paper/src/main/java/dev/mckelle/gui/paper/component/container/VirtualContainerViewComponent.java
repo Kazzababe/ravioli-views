@@ -4,7 +4,6 @@ import com.google.common.base.Predicates;
 import dev.mckelle.gui.api.context.IRenderContext;
 import dev.mckelle.gui.api.render.ViewRenderable;
 import dev.mckelle.gui.api.state.Ref;
-import dev.mckelle.gui.paper.PaperComponents;
 import dev.mckelle.gui.paper.component.ViewComponent;
 import dev.mckelle.gui.paper.context.RenderContext;
 import org.bukkit.entity.Player;
@@ -74,6 +73,15 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
          * @return The size of the container (width × height).
          */
         int size();
+
+        /**
+         * Converts a root-inventory slot index to this container’s local slot index <b>(0 – size-1)</b>.
+         * If the supplied slot does not belong to this container the method returns <code>-1</code>.
+         *
+         * @param rootSlot the absolute slot index in the top inventory.
+         * @return local slot index, or <code>-1</code> when the slot is outside the container.
+         */
+        int toLocalSlot(int rootSlot);
     }
 
     /**
@@ -308,6 +316,25 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
         @Override
         public int size() {
             return VirtualContainerViewComponent.this.backing.length;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public int toLocalSlot(final int rootSlot) {
+            final int row = rootSlot / 9;
+            final int column = rootSlot % 9;
+
+            if (row < this.originY || row >= this.originY + VirtualContainerViewComponent.this.height) {
+                return -1;
+            }
+            if (column < this.originX || column >= this.originX + VirtualContainerViewComponent.this.width) {
+                return -1;
+            }
+            return (row - this.originY) *
+                VirtualContainerViewComponent.this.width +
+                (column - this.originX);
         }
     }
 

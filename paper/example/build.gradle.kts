@@ -21,6 +21,6 @@ java {
 
 tasks {
     assemble {
-        dependsOn("shadowJar")
+        dependsOn(reobfJar)
     }
 }
