@@ -1,16 +1,17 @@
 package dev.mckelle.gui.paper.command;
 
+import dev.mckelle.gui.paper.ViewManager;
+import dev.mckelle.gui.paper.view.DropperView;
+import dev.mckelle.gui.paper.view.PaginatedView;
+import dev.mckelle.gui.paper.view.SimpleCounterView;
+import dev.mckelle.gui.paper.view.View;
+import dev.mckelle.gui.paper.view.VirtualInventoryView;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
-import dev.mckelle.gui.paper.ViewManager;
-import dev.mckelle.gui.paper.view.PaginatedView;
-import dev.mckelle.gui.paper.view.SimpleCounterView;
-import dev.mckelle.gui.paper.view.View;
-import dev.mckelle.gui.paper.view.VirtualInventoryView;
 
 import java.util.Arrays;
 import java.util.List;
@@ -73,7 +74,8 @@ public final class OpenViewCommand implements CommandExecutor, TabCompleter {
     public enum Views {
         COUNTER(SimpleCounterView.class),
         VIRTUAL_INVENTORY(VirtualInventoryView.class),
-        PAGINATION(PaginatedView.class);
+        PAGINATION(PaginatedView.class),
+        DROPPER(DropperView.class);
 
         private final Class<? extends View<?>> viewClass;
 

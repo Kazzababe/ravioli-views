@@ -1,13 +1,13 @@
 package dev.mckelle.gui.paper.view;
 
-import org.bukkit.Material;
-import org.bukkit.inventory.ItemStack;
-import org.jetbrains.annotations.NotNull;
 import dev.mckelle.gui.api.state.Ref;
 import dev.mckelle.gui.paper.component.container.LayoutContainerViewComponent;
 import dev.mckelle.gui.paper.component.container.VirtualContainerViewComponent;
 import dev.mckelle.gui.paper.context.InitContext;
 import dev.mckelle.gui.paper.context.RenderContext;
+import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
+import org.jetbrains.annotations.NotNull;
 
 import static dev.mckelle.gui.paper.PaperComponents.item;
 

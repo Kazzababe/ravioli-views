@@ -1,5 +1,6 @@
 package dev.mckelle.gui.api.context;
 
+import dev.mckelle.gui.api.IView;
 import dev.mckelle.gui.api.component.IViewComponent;
 import dev.mckelle.gui.api.interaction.ClickHandler;
 import dev.mckelle.gui.api.render.ViewRenderable;
@@ -448,6 +449,36 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
      * @return origin row index
      */
     int getOriginY();
+
+    /**
+     * Returns the width of the current component being rendered
+     *
+     * @return the width of the component being rendered
+     */
+    int getWidth();
+
+    /**
+     * Returns the height of the current component being rendered
+     *
+     * @return the height of the component being rendered
+     */
+    int getHeight();
+
+    /**
+     * Returns the width of the view this component is rendering within or the view itself if called within the
+     * root {@link IView#render}.
+     *
+     * @return the width of view
+     */
+    int getViewWidth();
+
+    /**
+     * Returns the height of the view this component is rendering within or the view itself if called within the
+     * root {@link IView#render}.
+     *
+     * @return the height of view
+     */
+    int getViewHeight();
 
     /**
      * Requests an asynchronous view update (re-render) at the next tick.

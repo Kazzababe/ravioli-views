@@ -43,6 +43,8 @@ public class PaperRenderContext<D> extends RootRenderContext<Player, D, ClickCon
      * @param visited     A set to track visited component paths for state cleanup.
      * @param schedule    A runnable that triggers a view update.
      * @param inventory   The Bukkit inventory this context is rendering into.
+     * @param width       The width of the view
+     * @param height      The height of the view
      */
     public PaperRenderContext(
         @Nullable final D props,
@@ -55,7 +57,9 @@ public class PaperRenderContext<D> extends RootRenderContext<Player, D, ClickCon
         @NotNull final Map<String, List<Effect>> effectMap,
         @NotNull final Set<String> visited,
         @NotNull final Runnable schedule,
-        @NotNull final Inventory inventory
+        @NotNull final Inventory inventory,
+        final int width,
+        final int height
     ) {
         super(
             props,
@@ -67,7 +71,9 @@ public class PaperRenderContext<D> extends RootRenderContext<Player, D, ClickCon
             refMap,
             effectMap,
             visited,
-            schedule
+            schedule,
+            width,
+            height
         );
 
         this.inventory = inventory;

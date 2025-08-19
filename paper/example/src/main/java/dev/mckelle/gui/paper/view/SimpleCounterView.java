@@ -1,16 +1,16 @@
 package dev.mckelle.gui.paper.view;
 
+import dev.mckelle.gui.api.state.State;
+import dev.mckelle.gui.core.hooks.Hooks;
+import dev.mckelle.gui.paper.PaperComponents;
+import dev.mckelle.gui.paper.context.InitContext;
+import dev.mckelle.gui.paper.context.RenderContext;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
-import dev.mckelle.gui.api.state.State;
-import dev.mckelle.gui.core.hooks.Hooks;
-import dev.mckelle.gui.paper.PaperComponents;
-import dev.mckelle.gui.paper.context.InitContext;
-import dev.mckelle.gui.paper.context.RenderContext;
 
 import java.time.Duration;
 import java.util.List;

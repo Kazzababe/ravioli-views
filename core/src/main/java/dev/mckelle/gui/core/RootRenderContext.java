@@ -48,11 +48,8 @@ import java.util.function.Supplier;
  * @param <C> the click context type
  */
 public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRenderContext<V, D, C> {
-    /**
-     * The standard width of a chest inventory.
-     */
-    private static final int WIDTH = 9;
-
+    private final int width;
+    private final int height;
     private final Map<String, List<State<?>>> stateMap;
     private final Map<String, List<Ref<?>>> refMap;
     private final Map<String, List<Effect>> effectMap;
@@ -85,6 +82,7 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
      * @param refMap      map to store ref objects
      * @param visited     set to track visited paths
      * @param schedule    callback to request updates
+     * @param width   width of the root inventory grid (columns)
      */
     public RootRenderContext(
         @Nullable final D props,
@@ -96,7 +94,9 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
         @NotNull final Map<String, List<Ref<?>>> refMap,
         @NotNull final Map<String, List<Effect>> effectMap,
         @NotNull final Set<String> visited,
-        @NotNull final Runnable schedule
+        @NotNull final Runnable schedule,
+        final int width,
+        final int height
     ) {
         this.props = props;
         this.scheduler = scheduler;
@@ -108,6 +108,8 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
         this.effectMap = effectMap;
         this.visited = visited;
         this.schedule = schedule;
+        this.width = width;
+        this.height = height;
         this.pathStack.push("root");
 
         this.visited.add("root");
@@ -316,8 +318,8 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
      */
     @Override
     public <K> void set(final int slot, @NotNull final IViewComponent<V, K, ?> component) {
-        final int localX = slot % WIDTH;
-        final int localY = slot / WIDTH;
+        final int localX = slot % this.width;
+        final int localY = slot / this.width;
 
         this.set(localX, localY, component);
     }
@@ -428,6 +430,26 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
     @Override
     public int getOriginY() {
         return 0;
+    }
+
+    @Override
+    public int getWidth() {
+        return this.width;
+    }
+
+    @Override
+    public int getHeight() {
+        return this.height;
+    }
+
+    @Override
+    public int getViewWidth() {
+        return this.width;
+    }
+
+    @Override
+    public int getViewHeight() {
+        return this.height;
     }
 
     /**
@@ -548,10 +570,10 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
      * @return The slot index, or -1 if out of bounds.
      */
     private int rootSlot(final int x, final int y) {
-        if (x >= WIDTH) {
+        if (x >= this.width) {
             return -1;
         }
-        return y * WIDTH + x;
+        return y * this.width + x;
     }
 
     /**
@@ -668,7 +690,7 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
             final int rootX = this.mapX(localX);
             final int rootY = this.mapY(localY);
 
-            if (rootX < 0 || rootX >= WIDTH) {
+            if (rootX < 0 || rootX >= RootRenderContext.this.width) {
                 return -1;
             }
             return RootRenderContext.this.rootSlot(rootX, rootY);
@@ -903,6 +925,38 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
         @Override
         public int getOriginY() {
             return this.originY;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public int getWidth() {
+            return this.limitWidth;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public int getHeight() {
+            return this.limitHeight;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public int getViewWidth() {
+            return RootRenderContext.this.getViewWidth();
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public int getViewHeight() {
+            return RootRenderContext.this.getViewHeight();
         }
 
         /**

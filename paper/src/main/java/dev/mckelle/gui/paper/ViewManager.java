@@ -26,6 +26,7 @@ import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -151,12 +152,32 @@ public final class ViewManager {
         if (view == null) {
             throw new IllegalArgumentException("Unknown view class " + viewClass.getName());
         }
-        final PaperInventoryRenderer<D> renderer = new PaperInventoryRenderer<>(this.plugin);
         final InitContext<D> init = new InitContext<>(player, props);
 
         view.init(init);
 
-        final ViewSession<D> session = renderer.mount(view, props, player, init.getTitle(), init.getSize() * 9);
+        final InventoryType inventoryType = init.getType();
+        final PaperInventoryRenderer<D> renderer = new PaperInventoryRenderer<>(inventoryType);
+        final int width;
+        final int height;
+
+        switch (inventoryType) {
+            case HOPPER -> {
+                width = 5;
+                height = 1;
+            }
+            case DISPENSER, DROPPER, CRAFTER -> {
+                width = 3;
+                height = 3;
+            }
+            case CHEST -> {
+                width = 9;
+                height = Math.clamp(init.getSize(), 1, 6);
+            }
+            default -> throw new IllegalArgumentException("Unsupported inventory type " + inventoryType);
+        }
+        final int slots = width * height;
+        final ViewSession<D> session = renderer.mount(view, props, player, init.getTitle(), slots);
         final ViewReconciler<Player> reconciler = new ViewReconciler<>(
             new IRenderContext.RenderContextCreator<Player, D, ClickContext, IRenderContext<Player, D, ClickContext>>() {
                 @Override
@@ -219,7 +240,9 @@ public final class ViewManager {
                         effectMap,
                         visited,
                         requestUpdateFn,
-                        session.inventory()
+                        session.inventory(),
+                        width,
+                        height
                     );
                 }
             },

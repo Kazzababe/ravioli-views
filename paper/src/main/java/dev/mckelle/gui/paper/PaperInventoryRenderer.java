@@ -12,10 +12,10 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
-import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -35,30 +35,25 @@ import java.util.UUID;
 public final class PaperInventoryRenderer<D> extends AbstractInventoryRenderer<Player, D, ItemStack, View<D>> {
     private static final NamespacedKey VIEW_ITEM_KEY = new NamespacedKey("ravioli-views", "view-item");
 
-    private final Plugin plugin;
+    private final InventoryType inventoryType;
 
     private final Map<Integer, ViewRenderable> renderables = new HashMap<>();
     private final Map<Integer, ClickHandler<Player, ClickContext>> clickMap = new HashMap<>();
 
     private ViewSession<D> session;
 
-    /**
-     * Creates a new PaperInventoryRenderer for the specified plugin.
-     *
-     * @param plugin the plugin instance that owns this renderer
-     */
-    PaperInventoryRenderer(@NotNull final Plugin plugin) {
-        this.plugin = plugin;
+    PaperInventoryRenderer(@NotNull final InventoryType inventoryType) {
+        this.inventoryType = inventoryType;
     }
 
     /**
      * Mounts a view by creating a Bukkit inventory and opening it for the player.
      *
      * @param rootView the root view to mount
-     * @param props optional properties to pass to the view
-     * @param viewer the player who will see the view
-     * @param title the title for the inventory
-     * @param size the size of the inventory (in slots)
+     * @param props    optional properties to pass to the view
+     * @param viewer   the player who will see the view
+     * @param title    the title for the inventory
+     * @param size     the size of the inventory (in slots)
      * @return the created view session
      */
     @Override
@@ -69,13 +64,16 @@ public final class PaperInventoryRenderer<D> extends AbstractInventoryRenderer<P
         @NotNull final Object title,
         final int size
     ) {
-        final Inventory inventory = Bukkit.createInventory(
-            new ViewInventoryHolder(),
-            size,
-            title instanceof final Component component
-                ? component
-                : Component.text(title.toString()));
+        final Inventory inventory;
+        final Component componentTitle = title instanceof final Component component
+            ? component :
+            Component.text(title.toString());
 
+        if (this.inventoryType == InventoryType.CHEST) {
+            inventory = Bukkit.createInventory(new ViewInventoryHolder(), size, componentTitle);
+        } else {
+            inventory = Bukkit.createInventory(new ViewInventoryHolder(), this.inventoryType, componentTitle);
+        }
         this.session = new ViewSession<>(rootView, props, viewer, inventory, this);
 
         ((ViewInventoryHolder) inventory.getHolder()).setSession(this.session);
@@ -162,7 +160,9 @@ public final class PaperInventoryRenderer<D> extends AbstractInventoryRenderer<P
         final List<Patch.Diff> normal = new ArrayList<>();
 
         for (final Patch.Diff diff : patch.diffs()) {
-            if (diff instanceof Patch.Set(final int slot, final ViewRenderable renderable, final ClickHandler<?, ?> click)) {
+            if (diff instanceof Patch.Set(
+                final int slot, final ViewRenderable renderable, final ClickHandler<?, ?> click
+            )) {
                 if (renderable instanceof VirtualContainerViewComponent.EditableSlot) {
                     this.renderables.put(slot, renderable);
                     this.clickMap.remove(slot);

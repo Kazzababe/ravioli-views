@@ -331,7 +331,6 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
             if (this.renderable == null) {
                 return;
             }
-
             if (this.click == null) {
                 this.context.set(this.x, this.y, this.renderable);
             } else {

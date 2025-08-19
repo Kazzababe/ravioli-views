@@ -255,6 +255,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
         private final Inventory inventory;
         private final int originX;
         private final int originY;
+        private final int viewWidth;
 
         /**
          * Creates a new handle, capturing the current inventory and render position.
@@ -265,6 +266,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
             this.inventory = context.getViewer().getOpenInventory().getTopInventory();
             this.originX = context.getOriginX();
             this.originY = context.getOriginY();
+            this.viewWidth = context.getViewWidth();
         }
 
         /**
@@ -277,7 +279,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
             final int localX = local % VirtualContainerViewComponent.this.width;
             final int localY = local / VirtualContainerViewComponent.this.width;
 
-            return (this.originY + localY) * 9 + (this.originX + localX);
+            return (this.originY + localY) * this.viewWidth + (this.originX + localX);
         }
 
         /**
@@ -323,8 +325,8 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
          */
         @Override
         public int toLocalSlot(final int rootSlot) {
-            final int row = rootSlot / 9;
-            final int column = rootSlot % 9;
+            final int row = rootSlot / this.viewWidth;
+            final int column = rootSlot % this.viewWidth;
 
             if (row < this.originY || row >= this.originY + VirtualContainerViewComponent.this.height) {
                 return -1;

@@ -3,6 +3,7 @@ package dev.mckelle.gui.paper.context;
 import dev.mckelle.gui.api.context.IInitContext;
 import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
+import org.bukkit.event.inventory.InventoryType;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -19,6 +20,7 @@ public final class InitContext<D> implements IInitContext<Player, D> {
 
     private int rows = 1;
     private Component title = Component.empty();
+    private InventoryType type = InventoryType.CHEST;
 
     /**
      * Creates a new InitContext for the specified player and properties.
@@ -47,6 +49,16 @@ public final class InitContext<D> implements IInitContext<Player, D> {
      */
     public @NotNull Component getTitle() {
         return this.title;
+    }
+
+    /**
+     * Gets the desired inventory type for this view.
+     * Defaults to CHEST if not explicitly set.
+     *
+     * @return the view inventory type
+     */
+    public @NotNull InventoryType getType() {
+        return this.type;
     }
 
     /**
@@ -83,6 +95,48 @@ public final class InitContext<D> implements IInitContext<Player, D> {
         } else {
             this.rows = Math.clamp(rows, 1, 6);
         }
+    }
+
+    /**
+     * Sets the inventory type for this view.
+     * For non-chest types, the row size is ignored by the renderer.
+     *
+     * @param type the Bukkit inventory type to use
+     */
+    public void type(@NotNull final InventoryType type) {
+        this.type = type;
+    }
+
+    /**
+     * Configures this view to use a Hopper inventory (5 columns, 1 row).
+     */
+    public void hopper() {
+        this.type = InventoryType.HOPPER;
+    }
+
+    /**
+     * Configures this view to use a Dispenser inventory (3x3 grid).
+     */
+    public void dispenser() {
+        this.type = InventoryType.DISPENSER;
+    }
+
+    /**
+     * Configures this view to use a Dropper inventory (3x3 grid).
+     */
+    public void dropper() {
+        this.type = InventoryType.DROPPER;
+    }
+
+    /**
+     * Configures this view to use a standard Chest inventory with the given number of rows.
+     * Rows are clamped to [1,6].
+     *
+     * @param rows the amount of rows for the chest; clamped 1-6.
+     */
+    public void chest(final int rows) {
+        this.type = InventoryType.CHEST;
+        this.size(rows);
     }
 
     /**

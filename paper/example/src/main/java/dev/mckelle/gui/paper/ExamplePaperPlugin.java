@@ -1,13 +1,14 @@
 package dev.mckelle.gui.paper;
 
+import dev.mckelle.gui.paper.command.OpenViewCommand;
+import dev.mckelle.gui.paper.view.DropperView;
+import dev.mckelle.gui.paper.view.PaginatedView;
+import dev.mckelle.gui.paper.view.SimpleCounterView;
+import dev.mckelle.gui.paper.view.VirtualInventoryView;
 import org.bukkit.Bukkit;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
-import dev.mckelle.gui.paper.command.OpenViewCommand;
-import dev.mckelle.gui.paper.view.PaginatedView;
-import dev.mckelle.gui.paper.view.SimpleCounterView;
-import dev.mckelle.gui.paper.view.VirtualInventoryView;
 
 import java.util.Objects;
 
@@ -30,6 +31,7 @@ public final class ExamplePaperPlugin extends JavaPlugin implements Listener {
         this.viewManager.registerView(new SimpleCounterView());
         this.viewManager.registerView(new VirtualInventoryView());
         this.viewManager.registerView(new PaginatedView());
+        this.viewManager.registerView(new DropperView());
         this.viewManager.register();
 
         Bukkit.getPluginManager().registerEvents(this, this);

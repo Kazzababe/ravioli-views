@@ -3,6 +3,8 @@
 Ravioli Views is a small framework for building inventory‑based UIs in Paper/Spigot plugins.
 It exposes a React‑like component model, a diff engine, and lifecycle hooks so you can describe an interface as simple Java objects instead of slot‑by‑slot code.
 
+For detailed guides, tutorials, and API references, please see the [**wiki**](https://github.com/Kazzababe/ravioli-views/wiki).
+
 ---
 
 ## 📚 Modules

@@ -1,13 +1,13 @@
 package dev.mckelle.gui.paper.view;
 
-import net.kyori.adventure.text.Component;
-import org.bukkit.Material;
-import org.bukkit.inventory.ItemStack;
-import org.jetbrains.annotations.NotNull;
 import dev.mckelle.gui.api.state.Ref;
 import dev.mckelle.gui.paper.component.container.PaginatedContainerViewComponent;
 import dev.mckelle.gui.paper.context.InitContext;
 import dev.mckelle.gui.paper.context.RenderContext;
+import net.kyori.adventure.text.Component;
+import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -107,8 +107,12 @@ public final class ViewReconciler<V> {
             final List<Effect> effectsToClean = this.effectMap.get(unmountedKey);
 
             if (effectsToClean != null) {
-                // Components don't unmount in the same way a view does, we just call cleanups of the useEffect hook
-                effectsToClean.forEach(Effect::cleanup);
+                // Run cleanup functions for effects under components that were pruned this render
+                effectsToClean.forEach((effect) -> {
+                    if (effect.cleanup().isPresent()) {
+                        effect.cleanup().get().run();
+                    }
+                });
             }
         }
         this.stateMap.keySet().retainAll(visited);
