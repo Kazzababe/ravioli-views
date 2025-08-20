@@ -4,9 +4,11 @@ import dev.mckelle.gui.api.component.IViewComponent;
 import dev.mckelle.gui.api.context.IClickContext;
 import dev.mckelle.gui.api.context.IRenderContext;
 import dev.mckelle.gui.api.render.ViewRenderable;
+import dev.mckelle.gui.api.interaction.ClickHandler;
 import dev.mckelle.gui.api.state.Ref;
 import dev.mckelle.gui.api.state.State;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -60,6 +62,25 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
          *                   number of items across all pages
          */
         void load(int page, int pageSize, BiConsumer<List<T>, Integer> callback);
+    }
+
+    /**
+     * Maps a cell's data item to an optional click handler for that cell.
+     *
+     * @param <V> viewer type
+     * @param <T> item type
+     * @param <C> click context type
+     */
+    @FunctionalInterface
+    public interface CellClick<V, T, C extends IClickContext<V>> {
+        /**
+         * Produces a click handler for the given item and its index or {@code null} for no click.
+         *
+         * @param value the item model to bind a click handler for
+         * @param index the 0-based index of the item within the current page
+         * @return a ClickHandler to invoke on click, or {@code null} for no click behavior
+         */
+        @Nullable ClickHandler<V, C> onClick(@NotNull T value, int index);
     }
 
     /**
@@ -126,6 +147,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
     private final List<int[]> slots;
     private final DataLoader<T> loader;
     private final CellRenderer<V, T> renderer;
+    private final CellClick<V, T, CC> clickMapper;
     private final Ref<Handle> handleRef;
 
     /**
@@ -133,15 +155,17 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      * in the mask represents a slot that can display an item. Items are filled in
      * row-major order across the non-space slots.
      *
-     * @param loader    A data loader that fetches items for a given page and page size, and invokes
-     *                  the callback with the loaded items and the total number of items.
-     * @param renderer  A function that transforms an item of type {@code T} into a {@link ViewRenderable}.
-     * @param handleRef A {@link Ref} that will be populated with the {@link Handle} on first render.
-     * @param mask      The layout mask rows. All rows must have the same length.
+     * @param loader      A data loader that fetches items for a given page and page size, and invokes
+     *                    the callback with the loaded items and the total number of items.
+     * @param renderer    A function that transforms an item of type {@code T} into a {@link ViewRenderable}.
+     * @param clickMapper Optional mapper that returns a click handler per item; may be {@code null} for no clicks.
+     * @param handleRef   A {@link Ref} that will be populated with the {@link Handle} on first render.
+     * @param mask        The layout mask rows. All rows must have the same length.
      */
     public PaginatedContainerViewComponent(
         @NotNull final DataLoader<T> loader,
         @NotNull final CellRenderer<V, T> renderer,
+        @Nullable final CellClick<V, T, CC> clickMapper,
         @NotNull final Ref<Handle> handleRef,
         @NotNull final String... mask
     ) {
@@ -159,7 +183,26 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         this.slots = computeSlots(this.mask);
         this.loader = loader;
         this.renderer = renderer;
+        this.clickMapper = clickMapper;
         this.handleRef = handleRef;
+    }
+
+    /**
+     * Backwards-compatible constructor without click mapping.
+     *
+     * @param loader    A data loader that fetches items for a given page and page size, and invokes
+     *                  the callback with the loaded items and the total number of items.
+     * @param renderer  A function that transforms an item of type {@code T} into a {@link ViewRenderable}.
+     * @param handleRef A {@link Ref} that will be populated with the {@link Handle} on first render.
+     * @param mask      The layout mask rows. All rows must have the same length.
+     */
+    public PaginatedContainerViewComponent(
+        @NotNull final DataLoader<T> loader,
+        @NotNull final CellRenderer<V, T> renderer,
+        @NotNull final Ref<Handle> handleRef,
+        @NotNull final String... mask
+    ) {
+        this(loader, renderer, null, handleRef, mask);
     }
 
     /**
@@ -168,9 +211,30 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      *
      * @param width     The number of columns in the container.
      * @param height    The number of rows in the container.
-     * @param loader    A function that loads data for a given page. It accepts the page index
-     *                  and a callback which should be invoked with the loaded items and the
-     *                  total number of items across all pages.
+     * @param loader    A data loader that fetches items for a given page and page size, and invokes
+     *                  the callback with the loaded items and the total number of items.
+     * @param renderer  A function that transforms an item of type {@code T} into a {@link ViewRenderable}.
+     * @param clickMapper Optional mapper that returns a click handler per item; may be {@code null} for no clicks.
+     * @param handleRef A {@link Ref} that will be populated with the {@link Handle} on first render.
+     */
+    public PaginatedContainerViewComponent(
+        final int width,
+        final int height,
+        @NotNull final DataLoader<T> loader,
+        @NotNull final CellRenderer<V, T> renderer,
+        @Nullable final CellClick<V, T, CC> clickMapper,
+        @NotNull final Ref<Handle> handleRef
+    ) {
+        this(loader, renderer, clickMapper, handleRef, rectMask(width, height));
+    }
+
+    /**
+     * Backwards-compatible rectangular constructor without click mapping.
+     *
+     * @param width     The number of columns in the container.
+     * @param height    The number of rows in the container.
+     * @param loader    A data loader that fetches items for a given page and page size, and invokes
+     *                  the callback with the loaded items and the total number of items.
      * @param renderer  A function that transforms an item of type {@code T} into a {@link ViewRenderable}.
      * @param handleRef A {@link Ref} that will be populated with the {@link Handle} on first render.
      */
@@ -181,7 +245,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         @NotNull final CellRenderer<V, T> renderer,
         @NotNull final Ref<Handle> handleRef
     ) {
-        this(loader, renderer, handleRef, rectMask(width, height));
+        this(loader, renderer, null, handleRef, rectMask(width, height));
     }
 
     private static @NotNull String[] rectMask(final int width, final int height) {
@@ -308,7 +372,20 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
             final int x = pos[0];
             final int y = pos[1];
 
-            context.set(x, y, this.renderer.render(data.get(i), i));
+            final T value = data.get(i);
+            final ViewRenderable renderable = this.renderer.render(value, i);
+
+            if (this.clickMapper != null) {
+                final ClickHandler<V, CC> click = this.clickMapper.onClick(value, i);
+
+                if (click != null) {
+                    context.set(x, y, renderable, click);
+                } else {
+                    context.set(x, y, renderable);
+                }
+            } else {
+                context.set(x, y, renderable);
+            }
         }
     }
 

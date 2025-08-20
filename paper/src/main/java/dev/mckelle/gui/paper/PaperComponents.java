@@ -5,12 +5,14 @@ import dev.mckelle.gui.api.state.Ref;
 import dev.mckelle.gui.paper.component.container.LayoutContainerViewComponent;
 import dev.mckelle.gui.paper.component.container.PaginatedContainerViewComponent;
 import dev.mckelle.gui.paper.component.container.VirtualContainerViewComponent;
+import dev.mckelle.gui.paper.context.ClickContext;
+
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
-import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
 /**
@@ -74,9 +76,30 @@ public final class PaperComponents {
     }
 
     /**
-     * Creates a paginated container component for displaying paginated data.
+     * Creates a paginated container component using a character mask.
      *
-     * @param loader    the data loader function (page, pageSize, callback)
+     * @param loader     the data loader (page, pageSize, callback)
+     * @param renderer   the cell renderer for individual items
+     * @param clickMapper optional click mapper that returns a click handler per item; null for no clicks
+     * @param handleRef  a reference that will receive the pagination handle
+     * @param mask       the character mask defining the layout structure
+     * @param <T>        the type of items in the paginated container
+     * @return a new PaginatedContainerViewComponent
+     */
+    public static <T> @NotNull PaginatedContainerViewComponent<T> paginatedContainer(
+        @NotNull final PaginatedContainerViewComponent.DataLoader<T> loader,
+        @NotNull final PaginatedContainerViewComponent.CellRenderer<Player, T> renderer,
+        @Nullable final PaginatedContainerViewComponent.CellClick<Player, T, ClickContext> clickMapper,
+        @NotNull final Ref<PaginatedContainerViewComponent.Handle> handleRef,
+        @NotNull final String... mask
+    ) {
+        return new PaginatedContainerViewComponent<>(loader, renderer, clickMapper, handleRef, mask);
+    }
+
+    /**
+     * Creates a paginated container component using a character mask (no clicks).
+     *
+     * @param loader    the data loader (page, pageSize, callback)
      * @param renderer  the cell renderer for individual items
      * @param handleRef a reference that will receive the pagination handle
      * @param mask      the character mask defining the layout structure
@@ -93,11 +116,34 @@ public final class PaperComponents {
     }
 
     /**
-     * Creates a paginated container component for displaying paginated data.
+     * Creates a paginated container component using a rectangular mask.
+     *
+     * @param width      the width of the container in slots
+     * @param height     the height of the container in slots
+     * @param loader     the data loader (page, pageSize, callback)
+     * @param renderer   the cell renderer for individual items
+     * @param clickMapper optional click mapper that returns a click handler per item; null for no clicks
+     * @param handleRef  a reference that will receive the pagination handle
+     * @param <T>        the type of items in the paginated container
+     * @return a new PaginatedContainerViewComponent
+     */
+    public static <T> @NotNull PaginatedContainerViewComponent<T> paginatedContainer(
+        final int width,
+        final int height,
+        @NotNull final PaginatedContainerViewComponent.DataLoader<T> loader,
+        @NotNull final PaginatedContainerViewComponent.CellRenderer<Player, T> renderer,
+        @Nullable final PaginatedContainerViewComponent.CellClick<Player, T, ClickContext> clickMapper,
+        @NotNull final Ref<PaginatedContainerViewComponent.Handle> handleRef
+    ) {
+        return new PaginatedContainerViewComponent<>(width, height, loader, renderer, clickMapper, handleRef);
+    }
+
+    /**
+     * Creates a paginated container component using a rectangular mask (no clicks).
      *
      * @param width     the width of the container in slots
      * @param height    the height of the container in slots
-     * @param loader    the data loader function (page, pageSize, callback)
+     * @param loader    the data loader (page, pageSize, callback)
      * @param renderer  the cell renderer for individual items
      * @param handleRef a reference that will receive the pagination handle
      * @param <T>       the type of items in the paginated container
