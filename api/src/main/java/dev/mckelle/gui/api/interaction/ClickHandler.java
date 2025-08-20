@@ -15,7 +15,7 @@ public interface ClickHandler<V, C extends IClickContext<V>> {
     /**
      * Handles a click event with the provided context.
      *
-     * @param clickHandler the click context containing information about the click event
+     * @param context the click context containing information about the click event
      */
-    void accept(@NotNull C clickHandler);
+    void accept(@NotNull C context);
 }

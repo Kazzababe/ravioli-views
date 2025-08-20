@@ -25,8 +25,8 @@ public final class ViewRegistry {
      * The view will be stored using its class as the key.
      *
      * @param view the view instance to register
-     * @param <V> the viewer type
-     * @param <T> the view type
+     * @param <V>  the viewer type
+     * @param <T>  the view type
      */
     @SuppressWarnings("unchecked")
     public <V, T extends IView<V, ?, ?, ?, ?, ?>> void registerView(final T view) {
@@ -37,9 +37,9 @@ public final class ViewRegistry {
      * Retrieves a registered view instance by its class.
      *
      * @param clazz the class of the view to retrieve
+     * @param <V>   the viewer type
+     * @param <T>   the view type
      * @return the registered view instance, or null if not found
-     * @param <V> the viewer type
-     * @param <T> the view type
      */
     @SuppressWarnings("unchecked")
     public <V, T extends IView<V, ?, ?, ?, ?, ?>> T getView(final Class<T> clazz) {

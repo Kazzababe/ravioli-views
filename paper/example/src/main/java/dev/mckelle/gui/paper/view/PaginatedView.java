@@ -20,18 +20,21 @@ public final class PaginatedView extends View<Object> {
         context.size(4);
         context.title("Pagination");
     }
-    
+
     @Override
     public void render(@NotNull final RenderContext<Object> context) {
         final Ref<PaginatedContainerViewComponent.Handle> paginationHandle = context.useRef();
 
+        final String[] mask = new String[] {
+            "#########",
+            "#########",
+            "#########"
+        };
         context.set(
             0,
             new PaginatedContainerViewComponent<String>(
-                9,
-                3,
                 (page, callback) -> {
-                    final int pageSize = 9 * 3;
+                    final int pageSize = mask[0].length() * mask.length; // all non-space slots are used
                     final int totalItems = (int) Math.round(pageSize * 2.5);
                     final int startIndex = page * pageSize;
 
@@ -57,7 +60,8 @@ public final class PaginatedView extends View<Object> {
 
                     return item(itemStack);
                 },
-                paginationHandle
+                paginationHandle,
+                mask
             )
         );
         context.set(
@@ -65,7 +69,7 @@ public final class PaginatedView extends View<Object> {
             3,
             item(new ItemStack(Material.ARROW)),
             (click) -> {
-                context.getViewer().sendMessage("Try go previous, current page = " +  paginationHandle.get().currentPage());
+                context.getViewer().sendMessage("Try go previous, current page = " + paginationHandle.get().currentPage());
                 paginationHandle.get().previous();
             }
         );
@@ -74,7 +78,7 @@ public final class PaginatedView extends View<Object> {
             3,
             item(new ItemStack(Material.ARROW)),
             (click) -> {
-                context.getViewer().sendMessage("Try go next, current page = " +  paginationHandle.get().currentPage());
+                context.getViewer().sendMessage("Try go next, current page = " + paginationHandle.get().currentPage());
                 paginationHandle.get().next();
             }
         );

@@ -10,11 +10,12 @@ plugins {
 
 allprojects {
     group = "dev.mckelle"
-    version = "1.0.23"
+    version = "1.0.24"
 }
 
 val projectName = "Ravioli Views"
-val projectDescription = "A modern, React-inspired GUI library for Paper/Spigot servers that uses a declarative, component-based architecture with hooks to simplify the creation of complex, reactive inventory UIs."
+val projectDescription =
+    "A modern, React-inspired GUI library for Paper/Spigot servers that uses a declarative, component-based architecture with hooks to simplify the creation of complex, reactive inventory UIs."
 val projectUrl = "https://github.com/Kazzababe/ravioli-views"
 val projectScmUrl = "scm:git:git://github.com/Kazzababe/ravioli-views.git"
 val projectScmConnection = "scm:git:ssh://git@github.com/Kazzababe/ravioli-views.git"

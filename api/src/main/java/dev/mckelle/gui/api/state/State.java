@@ -21,7 +21,7 @@ public class State<T> {
     /**
      * Creates a new state container with an initial value and change listener.
      *
-     * @param initialValue the initial value for this state (can be null)
+     * @param initialValue   the initial value for this state (can be null)
      * @param changeListener the listener to be called when the value changes
      */
     public State(@Nullable final T initialValue, @NotNull final Consumer<Void> changeListener) {

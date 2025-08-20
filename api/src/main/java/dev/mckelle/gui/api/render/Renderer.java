@@ -10,8 +10,8 @@ import org.jetbrains.annotations.Nullable;
  * Defines how a view tree is mounted, updated, and unmounted for a particular
  * viewer context.
  *
- * @param <V> type of the viewer (for example, a UI client or user session)
- * @param <D> type of the data/props passed to the view
+ * @param <V>  type of the viewer (for example, a UI client or user session)
+ * @param <D>  type of the data/props passed to the view
  * @param <V2> type of the root view (must extend IView)
  */
 public interface Renderer<V, D, V2 extends IView<V, D, ?, ?, ?, ?>> {
@@ -21,11 +21,11 @@ public interface Renderer<V, D, V2 extends IView<V, D, ?, ?, ?, ?>> {
      * or resources. This is invoked once before the first render.
      * </p>
      *
-     * @param rootView the root view instance to mount
+     * @param rootView     the root view instance to mount
      * @param initialProps the initial properties to pass to the view (may be null)
-     * @param viewer   the target viewer context
-     * @param title    title or header to display (toString() will be used)
-     * @param size     number of rows or units for the container
+     * @param viewer       the target viewer context
+     * @param title        title or header to display (toString() will be used)
+     * @param size         number of rows or units for the container
      * @return a session handle that will be used for subsequent updates and unmount
      */
     @NotNull
@@ -46,9 +46,9 @@ public interface Renderer<V, D, V2 extends IView<V, D, ?, ?, ?, ?>> {
      * <b>Note: </b>
      * it's expected for renderers to track their own view session as well due to the nature of a single
      * renderer being associated with a single view session.
-     *</p>
-     * @param session the session created during mounting
+     * </p>
      *
+     * @param session the session created during mounting
      */
     void unmount(IViewSession<V, D> session);
 

@@ -26,7 +26,7 @@ public final class InitContext<D> implements IInitContext<Player, D> {
      * Creates a new InitContext for the specified player and properties.
      *
      * @param viewer the player who will view the GUI
-     * @param props optional properties passed to the view
+     * @param props  optional properties passed to the view
      */
     public InitContext(@NotNull final Player viewer, @Nullable final D props) {
         this.viewer = viewer;

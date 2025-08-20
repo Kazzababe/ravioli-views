@@ -4,7 +4,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Provides initialization parameters for a View when a session ends for a viewer.
+ * Provides close-phase context for a View when a session ends for a viewer.
  *
  * @param <V> type of the viewer
  * @param <D> type of the optional properties passed into the view

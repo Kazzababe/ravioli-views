@@ -15,7 +15,7 @@ import java.util.List;
  * @param diffs the list of differences to apply
  */
 public record Patch(@NotNull List<Diff> diffs) {
-    
+
     /**
      * A sealed interface representing a single difference operation.
      * Implementations define specific types of changes that can be applied.
@@ -26,11 +26,12 @@ public record Patch(@NotNull List<Diff> diffs) {
     /**
      * A difference that sets a renderable item at a specific slot.
      *
-     * @param slot the slot index where the item should be placed
+     * @param slot       the slot index where the item should be placed
      * @param renderable the item to render at the slot
-     * @param click the click handler for the slot, or null if no handler
+     * @param click      the click handler for the slot, or null if no handler
      */
-    public record Set(int slot, @NotNull ViewRenderable renderable, @Nullable ClickHandler<?, ?> click) implements Diff {
+    public record Set(int slot, @NotNull ViewRenderable renderable,
+                      @Nullable ClickHandler<?, ?> click) implements Diff {
     }
 
     /**

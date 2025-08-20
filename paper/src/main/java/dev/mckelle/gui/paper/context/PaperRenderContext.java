@@ -116,11 +116,11 @@ public class PaperRenderContext<D> extends RootRenderContext<Player, D, ClickCon
         /**
          * Constructs a new Paper-specific child render context.
          *
-         * @param props    The properties for the component being rendered.
-         * @param originX  The starting x-coordinate of this context relative to its parent.
-         * @param originY  The starting y-coordinate of this context relative to its parent.
-         * @param width    The width of this context's renderable area.
-         * @param height   The height of this context's renderable area.
+         * @param props     The properties for the component being rendered.
+         * @param originX   The starting x-coordinate of this context relative to its parent.
+         * @param originY   The starting y-coordinate of this context relative to its parent.
+         * @param width     The width of this context's renderable area.
+         * @param height    The height of this context's renderable area.
          * @param inventory The root Bukkit inventory being rendered to.
          */
         public PaperChildContext(

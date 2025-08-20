@@ -20,7 +20,7 @@ public interface Scheduler {
     /**
      * Runs a task once after a specified delay.
      *
-     * @param task the task to run
+     * @param task  the task to run
      * @param delay the delay before running the task
      * @return a handle to the scheduled task
      */
@@ -29,7 +29,7 @@ public interface Scheduler {
     /**
      * Runs a task repeatedly with the given tick interval.
      *
-     * @param task the task to run
+     * @param task     the task to run
      * @param interval delay between executions
      * @return a handle to the scheduled repeating task
      */

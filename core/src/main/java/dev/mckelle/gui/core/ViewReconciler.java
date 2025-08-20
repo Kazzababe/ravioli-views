@@ -46,8 +46,8 @@ public final class ViewReconciler<V> {
      * Creates a new ViewReconciler for the specified view session.
      *
      * @param renderContextCreator factory for creating render contexts
-     * @param viewInstance the view session to reconcile
-     * @param renderer the renderer to apply patches to
+     * @param viewInstance         the view session to reconcile
+     * @param renderer             the renderer to apply patches to
      */
     public ViewReconciler(
         @NotNull final IRenderContext.RenderContextCreator<V, ?, ?, ?> renderContextCreator,
@@ -123,16 +123,15 @@ public final class ViewReconciler<V> {
 
         nextItems.forEach((slot, renderable) -> {
             final ViewRenderable previousRenderable = this.prevItems.get(slot);
+            final ClickHandler prevClick = this.prevClicks.get(slot);
+            final ClickHandler nextClick = nextClicks.get(slot);
+            final boolean renderableChanged = !Objects.equals(previousRenderable, renderable);
+            final boolean clickChanged = !Objects.equals(prevClick, nextClick);
 
-            if (Objects.equals(previousRenderable, renderable)) {
+            if (!renderableChanged && !clickChanged) {
                 return;
             }
-            // React mindset would enforce comparing click handlers as well but this would require
-            // consumers to memoize the click handler and for an environment as limited as Minecraft, that just
-            // seems to be extra complexity with no gain
-            final ClickHandler clickHandler = nextClicks.get(slot);
-
-            diffs.add(new Patch.Set(slot, renderable, clickHandler));
+            diffs.add(new Patch.Set(slot, renderable, nextClick));
         });
 
         for (final int slot : this.prevItems.keySet()) {

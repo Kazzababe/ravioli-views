@@ -8,6 +8,8 @@ import dev.mckelle.gui.api.state.Ref;
 import dev.mckelle.gui.api.state.State;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -83,37 +85,99 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         @NotNull ViewRenderable render(@NotNull T value, int index);
     }
 
-    private final int width;
-    private final int height;
+    private final String[] mask;
+    /**
+     * Cached list of slot coordinates (x, y) where items may be rendered.
+     * A slot is any position in the mask that is not a space character.
+     * Order is row-major by mask traversal.
+     */
+    private final List<int[]> slots;
     private final BiConsumer<Integer, BiConsumer<List<T>, Integer>> loader;
     private final CellRenderer<V, T> renderer;
     private final Ref<Handle> handleRef;
 
     /**
-     * Creates a new paginated container.
+     * Creates a new paginated container from a character mask. Any non-space character
+     * in the mask represents a slot that can display an item. Items are filled in
+     * row-major order across the non-space slots.
      *
-     * @param width     The width of the container in columns.
-     * @param height    The height of the container in rows.
-     * @param loader    A function that loads data for a given page. It accepts the page
-     * index and a callback, which should be invoked with the loaded
-     * item list and the total number of pages.
-     * @param renderer  A function that transforms an item of type {@code T} into a
-     * {@link ViewRenderable}.
-     * @param handleRef A {@link Ref} that will be populated with the {@link Handle} on
-     * first render, allowing for programmatic control.
+     * @param loader    A function that loads data for a given page. It accepts the page index
+     *                  and a callback which should be invoked with the loaded items and the
+     *                  total number of items across all pages.
+     * @param renderer  A function that transforms an item of type {@code T} into a {@link ViewRenderable}.
+     * @param handleRef A {@link Ref} that will be populated with the {@link Handle} on first render.
+     * @param mask      The layout mask rows. All rows must have the same length.
+     */
+    public PaginatedContainerViewComponent(
+        @NotNull final BiConsumer<Integer /*page*/, BiConsumer<List<T>, Integer /*totalItems*/>> loader,
+        @NotNull final CellRenderer<V, T> renderer,
+        @NotNull final Ref<Handle> handleRef,
+        @NotNull final String... mask
+    ) {
+        if (mask.length == 0) {
+            throw new IllegalArgumentException("mask must contain rows");
+        }
+        final int width = mask[0].length();
+
+        for (final String row : mask) {
+            if (row.length() != width) {
+                throw new IllegalArgumentException("all rows must be same length");
+            }
+        }
+        this.mask = mask.clone();
+        this.slots = computeSlots(this.mask);
+        this.loader = loader;
+        this.renderer = renderer;
+        this.handleRef = handleRef;
+    }
+
+    /**
+     * Backwards-compatible constructor that builds a full rectangular mask of size
+     * width x height where every slot is used.
      */
     public PaginatedContainerViewComponent(
         final int width,
         final int height,
-        @NotNull final BiConsumer<Integer /*page*/, BiConsumer<List<T>, Integer /*total*/>> loader,
+        @NotNull final BiConsumer<Integer, BiConsumer<List<T>, Integer>> loader,
         @NotNull final CellRenderer<V, T> renderer,
         @NotNull final Ref<Handle> handleRef
     ) {
-        this.width = width;
-        this.height = height;
-        this.loader = loader;
-        this.renderer = renderer;
-        this.handleRef = handleRef;
+        this(loader, renderer, handleRef, rectMask(width, height));
+    }
+
+    private static @NotNull String[] rectMask(final int width, final int height) {
+        if (width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("width and height must be positive");
+        }
+        final String[] mask = new String[height];
+        final char[] row = new char[width];
+
+        Arrays.fill(row, '#'); // We can use any character for the mask
+
+        final String rowString = new String(row);
+
+        Arrays.fill(mask, rowString);
+
+        return mask;
+    }
+
+    /**
+     * Computes the list of slot coordinates for a given mask.
+     * Any non-space character is considered a valid slot.
+     */
+    private static List<int[]> computeSlots(@NotNull final String[] mask) {
+        final List<int[]> list = new ArrayList<>();
+
+        for (int y = 0; y < mask.length; y++) {
+            final String row = mask[y];
+
+            for (int x = 0; x < row.length(); x++) {
+                if (row.charAt(x) != ' ') {
+                    list.add(new int[] {x, y});
+                }
+            }
+        }
+        return Collections.unmodifiableList(list);
     }
 
     /**
@@ -121,7 +185,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      */
     @Override
     public int getWidth() {
-        return this.width;
+        return this.mask[0].length();
     }
 
     /**
@@ -129,7 +193,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      */
     @Override
     public int getHeight() {
-        return this.height;
+        return this.mask.length;
     }
 
     /**
@@ -177,7 +241,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
                 }
             });
         }
-        final int capacity = this.width * this.height;
+        final int capacity = this.slots.size();
 
         if (!busy.get() && !page.get().equals(lastLoadedPage.get())) {
             busy.set(true);
@@ -201,8 +265,9 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         final List<T> data = items.get();
 
         for (int i = 0; i < data.size() && i < capacity; i++) {
-            final int x = i % this.width;
-            final int y = i / this.width;
+            final int[] pos = this.slots.get(i);
+            final int x = pos[0];
+            final int y = pos[1];
 
             context.set(x, y, this.renderer.render(data.get(i), i));
         }
@@ -248,14 +313,23 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      * @param <RC>     The render context type.
      * @return A new paginated container component configured for synchronous pagination.
      */
+    // Removed the ambiguous sync overload without data source to avoid misuse.
+
+    /**
+     * Creates a paginated container for a static, pre-loaded list of items.
+     *
+     * @param mask     The layout mask. Any non-space character is treated as an item slot.
+     * @param fullList The complete list of items to paginate.
+     * @param renderer The renderer for individual items.
+     * @param handle   The ref that will receive the pagination handle.
+     */
     public static <V, T, CC extends IClickContext<V>, RC extends IRenderContext<V, Void, CC>> PaginatedContainerViewComponent<V, T, CC, RC> sync(
-        final int width,
-        final int height,
+        @NotNull final String[] mask,
         @NotNull final List<T> fullList,
         @NotNull final CellRenderer<V, T> renderer,
         @NotNull final Ref<Handle> handle
     ) {
-        final int pageSize = width * height;
+        final int pageSize = computeSlots(mask).size();
 
         final BiConsumer<Integer, BiConsumer<List<T>, Integer>> loader = (page, callback) -> {
             final int from = page * pageSize;
@@ -267,17 +341,16 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
             );
         };
 
-        return new PaginatedContainerViewComponent<>(width, height, loader, renderer, handle);
+        return new PaginatedContainerViewComponent<>(loader, renderer, handle, mask);
     }
 
     /**
      * Creates a paginated container where items are loaded on-demand and asynchronously.
      *
-     * @param width              The number of columns in the container.
-     * @param height             The number of rows in the container.
+     * @param mask               The layout mask. Any non-space character is treated as an item slot.
      * @param asyncLoader        A function that loads a page of items asynchronously,
-     * returning a {@code CompletableFuture}.
-     * @param totalPagesSupplier A function that provides the total number of pages.
+     *                           returning a {@code CompletableFuture}.
+     * @param totalItemsSupplier A function that provides the total number of items across all pages.
      * @param renderer           The renderer for individual items.
      * @param handle             The ref that will receive the pagination handle.
      * @param <V>                The viewer type.
@@ -287,18 +360,17 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      * @return A new paginated container component configured for asynchronous pagination.
      */
     public static <V, T, CC extends IClickContext<V>, RC extends IRenderContext<V, Void, CC>> PaginatedContainerViewComponent<V, T, CC, RC> async(
-        final int width,
-        final int height,
+        @NotNull final String[] mask,
         @NotNull final Function<Integer /*page*/, CompletableFuture<List<T>>> asyncLoader,
-        @NotNull final Function<Integer /*page*/, Integer> totalPagesSupplier,
+        @NotNull final Function<Integer /*page*/, Integer> totalItemsSupplier,
         @NotNull final CellRenderer<V, T> renderer,
         @NotNull final Ref<Handle> handle
     ) {
         final BiConsumer<Integer, BiConsumer<List<T>, Integer>> loader = (page, callback) ->
             asyncLoader
                 .apply(page)
-                .thenAccept((list) -> callback.accept(list, totalPagesSupplier.apply(page)));
+                .thenAccept((list) -> callback.accept(list, totalItemsSupplier.apply(page)));
 
-        return new PaginatedContainerViewComponent<>(width, height, loader, renderer, handle);
+        return new PaginatedContainerViewComponent<>(loader, renderer, handle, mask);
     }
 }

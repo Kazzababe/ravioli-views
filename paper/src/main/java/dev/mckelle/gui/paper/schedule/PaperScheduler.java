@@ -1,7 +1,3 @@
-/**
- * Paper-specific implementation of the platform-agnostic {@link dev.mckelle.gui.api.schedule.Scheduler}.
- * Wraps Bukkit's scheduler so core hooks can remain server-platform neutral.
- */
 package dev.mckelle.gui.paper.schedule;
 
 import dev.mckelle.gui.api.schedule.Scheduler;
@@ -40,14 +36,15 @@ public final class PaperScheduler implements Scheduler {
     public @NotNull TaskHandle run(@NotNull final Runnable task) {
         Bukkit.getScheduler().getMainThreadExecutor(this.plugin).execute(task);
 
-        return () -> {}; // Executed immediately, not cancellable
+        return () -> {
+        }; // Executed immediately, not cancellable
     }
 
     /**
      * Runs a task after the specified delay.
      * The task is executed on the main thread after the delay period.
      *
-     * @param task the task to run
+     * @param task  the task to run
      * @param delay the delay before executing the task
      * @return a TaskHandle that can be used to cancel the task
      */
@@ -63,7 +60,7 @@ public final class PaperScheduler implements Scheduler {
      * Runs a task repeatedly with the specified interval.
      * The task is executed on the main thread at regular intervals.
      *
-     * @param task the task to run repeatedly
+     * @param task     the task to run repeatedly
      * @param interval the interval between task executions
      * @return a TaskHandle that can be used to cancel the repeating task
      */

@@ -15,9 +15,9 @@ import org.jetbrains.annotations.NotNull;
  * containers. It handles the basic patch application logic and provides abstract
  * methods for platform-specific item management.
  *
- * @param <V> the viewer type
- * @param <D> the data/props type
- * @param <K> the platform-specific item type (e.g., ItemStack for Bukkit)
+ * @param <V>  the viewer type
+ * @param <D>  the data/props type
+ * @param <K>  the platform-specific item type (e.g., ItemStack for Bukkit)
  * @param <V2> the view type
  */
 public abstract class AbstractInventoryRenderer<V, D, K, V2 extends IView<V, D, ?, ?, ?, ?>> implements Renderer<V, D, V2> {
@@ -27,7 +27,7 @@ public abstract class AbstractInventoryRenderer<V, D, K, V2 extends IView<V, D, 
     public AbstractInventoryRenderer() {
         // Default constructor
     }
-    
+
     /**
      * Unmounts a view session by cancelling all associated scheduled tasks.
      * This method must be called by overriding implementations.

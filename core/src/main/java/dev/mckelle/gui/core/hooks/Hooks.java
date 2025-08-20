@@ -136,7 +136,8 @@ public final class Hooks {
 
                     return task::cancel;
                 }
-                return () -> {};
+                return () -> {
+                };
             },
             List.of(readyAtTimestamp.get())
         );

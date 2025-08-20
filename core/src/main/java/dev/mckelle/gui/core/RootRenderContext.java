@@ -82,7 +82,7 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
      * @param refMap      map to store ref objects
      * @param visited     set to track visited paths
      * @param schedule    callback to request updates
-     * @param width   width of the root inventory grid (columns)
+     * @param width       width of the root inventory grid (columns)
      */
     public RootRenderContext(
         @Nullable final D props,
@@ -370,14 +370,23 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
      * {@inheritDoc}
      */
     @Override
-    public void set(final int x, final int y, @NotNull final ViewRenderable r, @NotNull final ClickHandler<V, C> clickHandler) {
+    public void set(final int x, final int y, @NotNull final ViewRenderable renderable, @NotNull final ClickHandler<V, C> clickHandler) {
         final int slot = this.rootSlot(x, y);
 
         if (slot == -1) {
             return;
         }
-        this.renderables.put(slot, r);
-        this.clicks.put(slot, clickHandler);
+        this.renderables.put(slot, renderable);
+        final ClickHandler<V, C> previous = this.clicks.get(slot);
+
+        if (previous == null) {
+            this.clicks.put(slot, clickHandler);
+        } else {
+            this.clicks.put(slot, (context) -> {
+                previous.accept(context);
+                clickHandler.accept(context);
+            });
+        }
     }
 
     /**
@@ -394,7 +403,16 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
     @Override
     public void set(final int slot, @NotNull final ViewRenderable renderable, @NotNull final ClickHandler<V, C> clickHandler) {
         this.renderables.put(slot, renderable);
-        this.clicks.put(slot, clickHandler);
+        final ClickHandler<V, C> previous = this.clicks.get(slot);
+
+        if (previous == null) {
+            this.clicks.put(slot, clickHandler);
+        } else {
+            this.clicks.put(slot, (ctx) -> {
+                previous.accept(ctx);
+                clickHandler.accept(ctx);
+            });
+        }
     }
 
     /**

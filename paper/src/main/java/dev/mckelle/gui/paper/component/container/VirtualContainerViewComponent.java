@@ -87,10 +87,12 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
     /**
      * A {@link ViewRenderable} that represents an empty, editable slot in a virtual container.
      *
-     * @param filter A predicate that determines which {@link ItemStack}s are allowed to be placed in this slot.
+     * @param filter   A predicate that determines which {@link ItemStack}s are allowed to be placed in this slot.
      * @param onChange A callback to be executed when the content of this slot changes.
      */
-    public record EditableSlot(@NotNull Predicate<@NotNull ItemStack> filter, @Nullable Consumer<ChangeEvent> onChange) implements ViewRenderable {}
+    public record EditableSlot(@NotNull Predicate<@NotNull ItemStack> filter,
+                               @Nullable Consumer<ChangeEvent> onChange) implements ViewRenderable {
+    }
 
     private final int width;
     private final int height;

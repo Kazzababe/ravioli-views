@@ -21,8 +21,8 @@ public final class CloseContext<D> implements ICloseContext<Player, D> {
     /**
      * Creates a new CloseContext for the specified player, properties, and inventory.
      *
-     * @param viewer the player who is closing the view
-     * @param props optional properties passed to the view
+     * @param viewer    the player who is closing the view
+     * @param props     optional properties passed to the view
      * @param inventory the inventory being closed
      */
     public CloseContext(

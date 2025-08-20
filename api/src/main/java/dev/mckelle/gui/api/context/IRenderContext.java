@@ -105,7 +105,7 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
      *
      * @param effect       A supplier that runs the effect and returns a {@link Runnable} for cleanup.
      * @param dependencies A list of values. The effect will re-run if any value in this list changes.
-     * If the list is empty ({@code List.of()}), the effect runs only once on mount.
+     *                     If the list is empty ({@code List.of()}), the effect runs only once on mount.
      */
     void useEffect(@NotNull Supplier<@NotNull Runnable> effect, @NotNull List<?> dependencies);
 

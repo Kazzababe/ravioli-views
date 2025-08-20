@@ -11,8 +11,8 @@ import org.jetbrains.annotations.Nullable;
  * <p>This abstract class should be extended to define custom view components.
  * It provides lifecycle methods for rendering and sizing, and an optional key for stable identity.</p>
  *
- * @param <V> type of the viewer
- * @param <D> type of optional props supplied when rendering this component
+ * @param <V>  type of the viewer
+ * @param <D>  type of optional props supplied when rendering this component
  * @param <RC> type of the render context
  */
 public abstract class IViewComponent<V, D, RC extends IRenderContext<V, D, ?>> {

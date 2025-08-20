@@ -51,14 +51,14 @@ import java.util.function.IntFunction;
  * }
  * });
  * </pre>
- *
+ * <p>
  * • Every distinct character is a logical "channel".
  * • {@link #map} methods let you declaratively describe what happens in each occurrence.
  *
- * @param <V> viewer type (e.g., Player)
+ * @param <V>  viewer type (e.g., Player)
  * @param <CC> click context type
  * @param <RC> render context type
- * @param <S> self-referencing type for method chaining
+ * @param <S>  self-referencing type for method chaining
  */
 public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC extends IRenderContext<V, Void, CC>, S extends LayoutContainerViewComponent<V, CC, RC, S>> extends IViewComponent<V, Void, RC> {
 
@@ -99,9 +99,9 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
         /**
          * Configures a slot at the given position and index.
          *
-         * @param index the occurrence index of this character (0-based)
-         * @param x the x-coordinate of this slot
-         * @param y the y-coordinate of this slot
+         * @param index   the occurrence index of this character (0-based)
+         * @param x       the x-coordinate of this slot
+         * @param y       the y-coordinate of this slot
          * @param builder the builder to configure the slot
          */
         void configure(
@@ -142,7 +142,7 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
      * Maps a character to a static renderable item.
      * All occurrences of the character will render the same item.
      *
-     * @param ch the character to map
+     * @param ch         the character to map
      * @param renderable the item to render for all occurrences of the character
      * @return this container for method chaining
      */
@@ -154,9 +154,9 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
      * Maps a character to a static renderable item with a static click handler.
      * All occurrences of the character will render the same item and execute the same click handler.
      *
-     * @param ch the character to map
+     * @param ch         the character to map
      * @param renderable the item to render for all occurrences of the character
-     * @param click the click handler to execute when any occurrence is clicked
+     * @param click      the click handler to execute when any occurrence is clicked
      * @return this container for method chaining
      */
     public final S map(
@@ -171,9 +171,9 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
      * Maps a character to a static renderable item with a simple runnable click handler.
      * All occurrences of the character will render the same item and execute the same action.
      *
-     * @param ch the character to map
+     * @param ch         the character to map
      * @param renderable the item to render for all occurrences of the character
-     * @param click the action to execute when any occurrence is clicked
+     * @param click      the action to execute when any occurrence is clicked
      * @return this container for method chaining
      */
     public final S map(
@@ -189,7 +189,7 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
      * The provided function is called for each occurrence of the character, allowing for
      * unique items based on the index.
      *
-     * @param ch the character to map
+     * @param ch                 the character to map
      * @param renderableProvider a function that accepts an index and returns the item to render
      * @return this container for method chaining
      */
@@ -207,8 +207,8 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
      * The provided functions are called for each occurrence, allowing for unique items and click behaviors
      * based on the index.
      *
-     * @param ch the character to map
-     * @param renderableProvider a function that accepts an index and returns the item to render
+     * @param ch                   the character to map
+     * @param renderableProvider   a function that accepts an index and returns the item to render
      * @param clickHandlerProvider a function that accepts an index and returns the click handler
      * @return this container for method chaining
      */
@@ -228,7 +228,7 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
      * This is the most flexible mapping option, providing the 0-based occurrence index,
      * the x/y coordinates in the grid, and a builder to set the item and handler.
      *
-     * @param ch the character to map
+     * @param ch         the character to map
      * @param configurer the configurer that will be called for each occurrence of the character
      * @return this container for method chaining
      */
@@ -291,8 +291,8 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
          * Creates a new builder for the specified position within the render context.
          *
          * @param context the render context to apply configurations to
-         * @param x the x-coordinate of the slot
-         * @param y the y-coordinate of the slot
+         * @param x       the x-coordinate of the slot
+         * @param y       the y-coordinate of the slot
          */
         BuilderImpl(@NotNull final IRenderContext<V, Void, C> context, final int x, final int y) {
             this.context = context;

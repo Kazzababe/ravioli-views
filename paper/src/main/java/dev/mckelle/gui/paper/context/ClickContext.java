@@ -22,7 +22,7 @@ public final class ClickContext implements IClickContext<Player> {
     /**
      * Creates a new ClickContext for the specified player and click event.
      *
-     * @param player the player who performed the click
+     * @param player     the player who performed the click
      * @param clickEvent the inventory click event that occurred
      */
     public ClickContext(@NotNull final Player player, @NotNull final InventoryClickEvent clickEvent) {

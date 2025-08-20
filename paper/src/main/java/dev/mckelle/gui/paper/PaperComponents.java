@@ -19,7 +19,7 @@ import java.util.function.Supplier;
  * that are commonly used in Paper/Spigot GUI applications.
  */
 public final class PaperComponents {
-    
+
     /**
      * Private constructor to prevent instantiation.
      */
@@ -60,8 +60,8 @@ public final class PaperComponents {
     /**
      * Creates a virtual container component for managing editable slots.
      *
-     * @param width the width of the container in slots
-     * @param height the height of the container in slots
+     * @param width     the width of the container in slots
+     * @param height    the height of the container in slots
      * @param handleRef a reference that will receive the container handle
      * @return a new VirtualContainerViewComponent
      */
@@ -76,20 +76,39 @@ public final class PaperComponents {
     /**
      * Creates a paginated container component for displaying paginated data.
      *
-     * @param width the width of the container in slots
-     * @param height the height of the container in slots
-     * @param loader the data loader function
-     * @param renderer the cell renderer for individual items
+     * @param loader    the data loader function
+     * @param renderer  the cell renderer for individual items
      * @param handleRef a reference that will receive the pagination handle
+     * @param mask      the character mask defining the layout structure
+     * @param <T>       the type of items in the paginated container
      * @return a new PaginatedContainerViewComponent
-     * @param <T> the type of items in the paginated container
+     */
+    public static <T> @NotNull PaginatedContainerViewComponent<T> paginatedContainer(
+        @NotNull final BiConsumer<Integer, BiConsumer<List<T>, Integer>> loader,
+        @NotNull final PaginatedContainerViewComponent.CellRenderer<Player, T> renderer,
+        @NotNull final Ref<PaginatedContainerViewComponent.Handle> handleRef,
+        @NotNull final String... mask
+    ) {
+        return new PaginatedContainerViewComponent<>(loader, renderer, handleRef, mask);
+    }
+
+    /**
+     * Creates a paginated container component for displaying paginated data.
+     *
+     * @param width     the width of the container in slots
+     * @param height    the height of the container in slots
+     * @param loader    the data loader function
+     * @param renderer  the cell renderer for individual items
+     * @param handleRef a reference that will receive the pagination handle
+     * @param <T>       the type of items in the paginated container
+     * @return a new PaginatedContainerViewComponent
      */
     public static <T> @NotNull PaginatedContainerViewComponent<T> paginatedContainer(
         final int width,
         final int height,
         @NotNull final BiConsumer<Integer, BiConsumer<List<T>, Integer>> loader,
-        @NotNull final dev.mckelle.gui.core.component.PaginatedContainerViewComponent.CellRenderer<Player, T> renderer,
-        @NotNull final Ref<dev.mckelle.gui.core.component.PaginatedContainerViewComponent.Handle> handleRef
+        @NotNull final PaginatedContainerViewComponent.CellRenderer<Player, T> renderer,
+        @NotNull final Ref<PaginatedContainerViewComponent.Handle> handleRef
     ) {
         return new PaginatedContainerViewComponent<>(width, height, loader, renderer, handleRef);
     }

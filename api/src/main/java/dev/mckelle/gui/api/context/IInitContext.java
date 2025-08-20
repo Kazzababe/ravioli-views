@@ -36,7 +36,7 @@ public interface IInitContext<V, D> {
      * Sets the title for the view.
      * Must be called during init; ignored during render.
      *
-     * @param title the title component string; must not be null
+     * @param title the title string; must not be null
      */
     void title(@NotNull String title);
 }
