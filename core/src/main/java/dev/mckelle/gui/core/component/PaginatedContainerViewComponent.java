@@ -31,6 +31,38 @@ import java.util.function.Function;
 public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, RC extends IRenderContext<V, Void, CC>> extends IViewComponent<V, Void, RC> {
 
     /**
+     * Loader interface for supplying items for a specific page and page size.
+     * Implementations should fetch items for the requested page and invoke the callback with
+     * the items for that page and the total number of items across all pages.
+     *
+     * @param <T> the item type produced by the loader
+     */
+    @FunctionalInterface
+    public interface DataLoader<T> {
+        /**
+         * Loads a page of items and provides them via the supplied callback.
+         * <p>
+         * Implementations may perform the work synchronously or asynchronously. If loading
+         * asynchronously, invoke the {@code callback} once the data becomes available. The
+         * {@code totalItems} passed to the callback must represent the total size of the
+         * entire data set (not the number of pages and not just the current page size).
+         * </p>
+         * <p>
+         * The paginated container will compute the total number of pages as
+         * {@code ceil(totalItems / (double) pageSize)}.
+         * </p>
+         *
+         * @param page       the 0-based page index to load
+         * @param pageSize   the maximum number of items that should be returned for this page
+         *                   (derived from the mask or width×height)
+         * @param callback   a consumer that must be invoked with the list of items for the
+         *                   requested page (size 0..pageSize) and {@code totalItems}, the total
+         *                   number of items across all pages
+         */
+        void load(int page, int pageSize, BiConsumer<List<T>, Integer> callback);
+    }
+
+    /**
      * An imperative handle for controlling pagination programmatically. It provides
      * methods to navigate between pages and query the current pagination state.
      */
@@ -92,7 +124,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      * Order is row-major by mask traversal.
      */
     private final List<int[]> slots;
-    private final BiConsumer<Integer, BiConsumer<List<T>, Integer>> loader;
+    private final DataLoader<T> loader;
     private final CellRenderer<V, T> renderer;
     private final Ref<Handle> handleRef;
 
@@ -101,15 +133,14 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      * in the mask represents a slot that can display an item. Items are filled in
      * row-major order across the non-space slots.
      *
-     * @param loader    A function that loads data for a given page. It accepts the page index
-     *                  and a callback which should be invoked with the loaded items and the
-     *                  total number of items across all pages.
+     * @param loader    A data loader that fetches items for a given page and page size, and invokes
+     *                  the callback with the loaded items and the total number of items.
      * @param renderer  A function that transforms an item of type {@code T} into a {@link ViewRenderable}.
      * @param handleRef A {@link Ref} that will be populated with the {@link Handle} on first render.
      * @param mask      The layout mask rows. All rows must have the same length.
      */
     public PaginatedContainerViewComponent(
-        @NotNull final BiConsumer<Integer /*page*/, BiConsumer<List<T>, Integer /*totalItems*/>> loader,
+        @NotNull final DataLoader<T> loader,
         @NotNull final CellRenderer<V, T> renderer,
         @NotNull final Ref<Handle> handleRef,
         @NotNull final String... mask
@@ -134,11 +165,19 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
     /**
      * Backwards-compatible constructor that builds a full rectangular mask of size
      * width x height where every slot is used.
+     *
+     * @param width     The number of columns in the container.
+     * @param height    The number of rows in the container.
+     * @param loader    A function that loads data for a given page. It accepts the page index
+     *                  and a callback which should be invoked with the loaded items and the
+     *                  total number of items across all pages.
+     * @param renderer  A function that transforms an item of type {@code T} into a {@link ViewRenderable}.
+     * @param handleRef A {@link Ref} that will be populated with the {@link Handle} on first render.
      */
     public PaginatedContainerViewComponent(
         final int width,
         final int height,
-        @NotNull final BiConsumer<Integer, BiConsumer<List<T>, Integer>> loader,
+        @NotNull final DataLoader<T> loader,
         @NotNull final CellRenderer<V, T> renderer,
         @NotNull final Ref<Handle> handleRef
     ) {
@@ -249,7 +288,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
 
             final int target = page.get();
 
-            this.loader.accept(target, (final List<T> list, final Integer total) ->
+            this.loader.load(target, capacity, (final List<T> list, final Integer total) ->
                 context.getScheduler().run(() -> {
                     // Drop stale responses.
                     if (page.get() != target) {
@@ -302,8 +341,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
     /**
      * Creates a paginated container for a static, pre-loaded list of items.
      *
-     * @param width    The number of columns in the container.
-     * @param height   The number of rows in the container.
+     * @param mask     The layout mask. Any non-space character is treated as an item slot.
      * @param fullList The complete list of items to paginate.
      * @param renderer The renderer for individual items.
      * @param handle   The ref that will receive the pagination handle.
@@ -311,17 +349,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      * @param <T>      The item type.
      * @param <CC>     The click context type.
      * @param <RC>     The render context type.
-     * @return A new paginated container component configured for synchronous pagination.
-     */
-    // Removed the ambiguous sync overload without data source to avoid misuse.
-
-    /**
-     * Creates a paginated container for a static, pre-loaded list of items.
-     *
-     * @param mask     The layout mask. Any non-space character is treated as an item slot.
-     * @param fullList The complete list of items to paginate.
-     * @param renderer The renderer for individual items.
-     * @param handle   The ref that will receive the pagination handle.
+     * @return         A new paginated container component configured for synchronous pagination.
      */
     public static <V, T, CC extends IClickContext<V>, RC extends IRenderContext<V, Void, CC>> PaginatedContainerViewComponent<V, T, CC, RC> sync(
         @NotNull final String[] mask,
@@ -329,16 +357,10 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         @NotNull final CellRenderer<V, T> renderer,
         @NotNull final Ref<Handle> handle
     ) {
-        final int pageSize = computeSlots(mask).size();
-
-        final BiConsumer<Integer, BiConsumer<List<T>, Integer>> loader = (page, callback) -> {
+        final DataLoader<T> loader = (page, pageSize, callback) -> {
             final int from = page * pageSize;
             final int to = Math.min(from + pageSize, fullList.size());
-
-            callback.accept(
-                fullList.subList(from, to),
-                (int) Math.ceil(fullList.size() / (double) pageSize)
-            );
+            callback.accept(fullList.subList(from, to), fullList.size());
         };
 
         return new PaginatedContainerViewComponent<>(loader, renderer, handle, mask);
@@ -366,7 +388,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         @NotNull final CellRenderer<V, T> renderer,
         @NotNull final Ref<Handle> handle
     ) {
-        final BiConsumer<Integer, BiConsumer<List<T>, Integer>> loader = (page, callback) ->
+        final DataLoader<T> loader = (page, pageSize, callback) ->
             asyncLoader
                 .apply(page)
                 .thenAccept((list) -> callback.accept(list, totalItemsSupplier.apply(page)));

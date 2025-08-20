@@ -33,8 +33,7 @@ public final class PaginatedView extends View<Object> {
         context.set(
             0,
             new PaginatedContainerViewComponent<String>(
-                (page, callback) -> {
-                    final int pageSize = mask[0].length() * mask.length; // all non-space slots are used
+                (page, pageSize, callback) -> {
                     final int totalItems = (int) Math.round(pageSize * 2.5);
                     final int startIndex = page * pageSize;
 

@@ -83,6 +83,7 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
      * @param visited     set to track visited paths
      * @param schedule    callback to request updates
      * @param width       width of the root inventory grid (columns)
+     * @param height      height of the root inventory grid (rows)
      */
     public RootRenderContext(
         @Nullable final D props,

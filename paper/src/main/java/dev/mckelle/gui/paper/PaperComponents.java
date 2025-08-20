@@ -76,7 +76,7 @@ public final class PaperComponents {
     /**
      * Creates a paginated container component for displaying paginated data.
      *
-     * @param loader    the data loader function
+     * @param loader    the data loader function (page, pageSize, callback)
      * @param renderer  the cell renderer for individual items
      * @param handleRef a reference that will receive the pagination handle
      * @param mask      the character mask defining the layout structure
@@ -84,7 +84,7 @@ public final class PaperComponents {
      * @return a new PaginatedContainerViewComponent
      */
     public static <T> @NotNull PaginatedContainerViewComponent<T> paginatedContainer(
-        @NotNull final BiConsumer<Integer, BiConsumer<List<T>, Integer>> loader,
+        @NotNull final PaginatedContainerViewComponent.DataLoader<T> loader,
         @NotNull final PaginatedContainerViewComponent.CellRenderer<Player, T> renderer,
         @NotNull final Ref<PaginatedContainerViewComponent.Handle> handleRef,
         @NotNull final String... mask
@@ -97,7 +97,7 @@ public final class PaperComponents {
      *
      * @param width     the width of the container in slots
      * @param height    the height of the container in slots
-     * @param loader    the data loader function
+     * @param loader    the data loader function (page, pageSize, callback)
      * @param renderer  the cell renderer for individual items
      * @param handleRef a reference that will receive the pagination handle
      * @param <T>       the type of items in the paginated container
@@ -106,7 +106,7 @@ public final class PaperComponents {
     public static <T> @NotNull PaginatedContainerViewComponent<T> paginatedContainer(
         final int width,
         final int height,
-        @NotNull final BiConsumer<Integer, BiConsumer<List<T>, Integer>> loader,
+        @NotNull final PaginatedContainerViewComponent.DataLoader<T> loader,
         @NotNull final PaginatedContainerViewComponent.CellRenderer<Player, T> renderer,
         @NotNull final Ref<PaginatedContainerViewComponent.Handle> handleRef
     ) {
