@@ -32,7 +32,7 @@ repositories {
 
 // Only the platform specific dependency is required
 dependencies {
-    implementation("dev.mckelle:ravioli-views-paper:1.0.0")
+    implementation("dev.mckelle:ravioli-views-paper:1.1.4")
 }
 ```
 
@@ -45,7 +45,7 @@ repositories {
 
 // Only the platform specific dependency is required
 dependencies {
-    implementation 'dev.mckelle:ravioli-views-paper:1.0.0'
+    implementation 'dev.mckelle:ravioli-views-paper:1.1.4'
 }
 ```
 
@@ -56,7 +56,7 @@ dependencies {
 <dependency>
     <groupId>dev.mckelle</groupId>
     <artifactId>ravioli-views-paper</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.4</version>
 </dependency>
 ```
 
