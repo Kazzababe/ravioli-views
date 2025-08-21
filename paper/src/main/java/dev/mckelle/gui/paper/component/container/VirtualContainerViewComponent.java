@@ -236,9 +236,8 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
     public void render(@NotNull final RenderContext<Void> context) {
         final Ref<Boolean> hasRendered = context.useRef(false);
 
-        if (this.handleRef.isEmpty()) {
-            this.handleRef.set(new ImperativeHandle(context));
-        }
+        this.handleRef.set(new ImperativeHandle(context));
+
         if (!hasRendered.get()) {
             for (int i = 0; i < this.backing.length; i++) {
                 final ItemStack initialItem = this.initialItems[i];

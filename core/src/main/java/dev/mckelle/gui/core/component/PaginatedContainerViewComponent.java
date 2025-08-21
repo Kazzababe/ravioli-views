@@ -367,35 +367,33 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         final State<Boolean> busy = context.useState(false);
 
         final Ref<Integer> lastLoadedPage = context.useRef(() -> -1);
+        
+        this.handleRef.set(new Handle() {
+            @Override
+            public void next() {
+                PaginatedContainerViewComponent.this.changePage(page, pages, page.get() + 1);
+            }
 
-        if (this.handleRef.isEmpty()) {
-            this.handleRef.set(new Handle() {
-                @Override
-                public void next() {
-                    PaginatedContainerViewComponent.this.changePage(page, pages, page.get() + 1);
-                }
+            @Override
+            public void previous() {
+                PaginatedContainerViewComponent.this.changePage(page, pages, page.get() - 1);
+            }
 
-                @Override
-                public void previous() {
-                    PaginatedContainerViewComponent.this.changePage(page, pages, page.get() - 1);
-                }
+            @Override
+            public void gotoPage(final int newPage) {
+                PaginatedContainerViewComponent.this.changePage(page, pages, newPage);
+            }
 
-                @Override
-                public void gotoPage(final int newPage) {
-                    PaginatedContainerViewComponent.this.changePage(page, pages, newPage);
-                }
+            @Override
+            public int currentPage() {
+                return page.get();
+            }
 
-                @Override
-                public int currentPage() {
-                    return page.get();
-                }
-
-                @Override
-                public int totalPages() {
-                    return pages.get();
-                }
-            });
-        }
+            @Override
+            public int totalPages() {
+                return pages.get();
+            }
+        });
         final int capacity = this.slots.size();
 
         if (!busy.get() && !page.get().equals(lastLoadedPage.get())) {
