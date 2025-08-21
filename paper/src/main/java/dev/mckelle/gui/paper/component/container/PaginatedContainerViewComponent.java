@@ -30,6 +30,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
     /**
      * Creates a Paper-specific paginated container (mask-based) with optional click mapper and executor.
      *
+     * @param key            The key for the component.
      * @param loader         data loader (page, pageSize, callback)
      * @param renderer       per-cell item renderer
      * @param clickMapper    optional per-item click mapper
@@ -38,6 +39,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
      * @param mask           character mask rows
      */
     public PaginatedContainerViewComponent(
+        @Nullable final String key,
         @NotNull final PaginatedContainerViewComponent.DataLoader<T> loader,
         @NotNull final CellRenderer<Player, T> renderer,
         @Nullable final PaginatedContainerViewComponent.CellClick<Player, T, ClickContext> clickMapper,
@@ -45,29 +47,32 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
         @Nullable final Executor loaderExecutor,
         @NotNull final String... mask
     ) {
-        super(loader, renderer, clickMapper, handleRef, loaderExecutor, mask);
+        super(key, loader, renderer, clickMapper, handleRef, loaderExecutor, mask);
     }
 
     /**
      * Backwards-compatible constructor without click mapping and executor (mask-based).
      *
+     * @param key       The key for the component.
      * @param loader    data loader (page, pageSize, callback)
      * @param renderer  per-cell item renderer
      * @param handleRef ref that will receive the pagination handle
      * @param mask      character mask rows
      */
     public PaginatedContainerViewComponent(
+        @Nullable final String key,
         @NotNull final PaginatedContainerViewComponent.DataLoader<T> loader,
         @NotNull final CellRenderer<Player, T> renderer,
         @NotNull final Ref<Handle> handleRef,
         @NotNull final String... mask
     ) {
-        super(loader, renderer, handleRef, mask);
+        super(key, loader, renderer, handleRef, mask);
     }
 
     /**
      * Creates a Paper-specific paginated container (rectangular) with optional click mapper and executor.
      *
+     * @param key            The key for the component.
      * @param width          number of columns
      * @param height         number of rows
      * @param loader         data loader (page, pageSize, callback)
@@ -77,6 +82,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
      * @param loaderExecutor optional executor on which to run the data loader (inline if {@code null})
      */
     public PaginatedContainerViewComponent(
+        @Nullable final String key,
         final int width,
         final int height,
         @NotNull final PaginatedContainerViewComponent.DataLoader<T> loader,
@@ -85,12 +91,13 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
         @NotNull final Ref<Handle> handleRef,
         @Nullable final Executor loaderExecutor
     ) {
-        super(width, height, loader, renderer, clickMapper, handleRef, loaderExecutor);
+        super(key, width, height, loader, renderer, clickMapper, handleRef, loaderExecutor);
     }
 
     /**
      * Backwards-compatible rectangular constructor without click mapping and executor.
      *
+     * @param key       The key for the component.
      * @param width     number of columns
      * @param height    number of rows
      * @param loader    data loader (page, pageSize, callback)
@@ -98,13 +105,14 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
      * @param handleRef ref that will receive the pagination handle
      */
     public PaginatedContainerViewComponent(
+        @Nullable final String key,
         final int width,
         final int height,
         @NotNull final PaginatedContainerViewComponent.DataLoader<T> loader,
         @NotNull final CellRenderer<Player, T> renderer,
         @NotNull final Ref<Handle> handleRef
     ) {
-        super(width, height, loader, renderer, handleRef);
+        super(key, width, height, loader, renderer, handleRef);
     }
 
     /**
@@ -122,7 +130,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
      *
      * @param <T> the item type of the paginated container
      */
-    public static final class Builder<T> implements ViewComponentBase.Builder<PaginatedContainerViewComponent<T>> {
+    public static final class Builder<T> implements ViewComponentBase.Builder<Builder<T>, PaginatedContainerViewComponent<T>> {
         private PaginatedContainerViewComponent.DataLoader<T> loader;
         private CellRenderer<Player, T> renderer;
         private PaginatedContainerViewComponent.CellClick<Player, T, ClickContext> clickMapper;
@@ -131,6 +139,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
         private Integer width;
         private Integer height;
         private Executor loaderExecutor;
+        private String key;
 
         /**
          * Creates a new builder.
@@ -342,12 +351,22 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
                 throw new IllegalStateException("handleRef is required");
             }
             if (this.mask != null) {
-                return new PaginatedContainerViewComponent<>(this.loader, this.renderer, this.clickMapper, this.handleRef, this.loaderExecutor, this.mask);
+                return new PaginatedContainerViewComponent<>(this.key, this.loader, this.renderer, this.clickMapper, this.handleRef, this.loaderExecutor, this.mask);
             }
             if (this.width != null && this.height != null) {
-                return new PaginatedContainerViewComponent<>(this.width, this.height, this.loader, this.renderer, this.clickMapper, this.handleRef, this.loaderExecutor);
+                return new PaginatedContainerViewComponent<>(this.key, this.width, this.height, this.loader, this.renderer, this.clickMapper, this.handleRef, this.loaderExecutor);
             }
             throw new IllegalStateException("either mask(...) or size(width,height) must be provided");
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public @NotNull Builder<T> key(@Nullable final String key) {
+            this.key = key;
+
+            return this;
         }
     }
 }

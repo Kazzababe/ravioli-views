@@ -119,10 +119,13 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
      * Creates a new layout container with the specified character mask.
      * Each string in the mask represents a row, and all rows must have the same length.
      *
+     * @param key  The key for the component.
      * @param mask the character mask defining the layout structure
      * @throws IllegalArgumentException if mask is empty or rows have different lengths
      */
-    public LayoutContainerViewComponent(@NotNull final String... mask) {
+    public LayoutContainerViewComponent(@Nullable final String key, @NotNull final String... mask) {
+        super(key);
+
         this.configurers = new HashMap<>();
 
         if (mask.length == 0) {

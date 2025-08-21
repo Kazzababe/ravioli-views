@@ -6,6 +6,7 @@ import dev.mckelle.gui.paper.context.ClickContext;
 import dev.mckelle.gui.paper.context.RenderContext;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -45,10 +46,11 @@ public final class LayoutContainerViewComponent extends dev.mckelle.gui.core.com
     /**
      * Creates a new layout container with the given string mask.
      *
+     * @param key  The key for the component.
      * @param mask One or more strings representing the rows of the layout.
      */
-    public LayoutContainerViewComponent(@NotNull final String... mask) {
-        super(mask);
+    public LayoutContainerViewComponent(@Nullable final String key, @NotNull final String... mask) {
+        super(key, mask);
     }
 
     /**
@@ -64,8 +66,9 @@ public final class LayoutContainerViewComponent extends dev.mckelle.gui.core.com
      * Builder for {@link LayoutContainerViewComponent} that collects a mask
      * and constructs the component instance. Supports char-channel mappings.
      */
-    public static final class Builder implements ViewComponentBase.Builder<LayoutContainerViewComponent> {
+    public static final class Builder implements ViewComponentBase.Builder<Builder, LayoutContainerViewComponent> {
         private String[] mask;
+        private String key;
         private final Map<Character, List<SlotConfigurer<Player, ClickContext>>> mappings = new HashMap<>();
 
         /**
@@ -170,7 +173,7 @@ public final class LayoutContainerViewComponent extends dev.mckelle.gui.core.com
             if (this.mask == null || this.mask.length == 0) {
                 throw new IllegalStateException("mask is required");
             }
-            final LayoutContainerViewComponent component = new LayoutContainerViewComponent(this.mask);
+            final LayoutContainerViewComponent component = new LayoutContainerViewComponent(this.key, this.mask);
 
             for (final var entry : this.mappings.entrySet()) {
                 final char ch = entry.getKey();
@@ -180,6 +183,16 @@ public final class LayoutContainerViewComponent extends dev.mckelle.gui.core.com
                 }
             }
             return component;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public @NotNull Builder key(@Nullable final String key) {
+            this.key = key;
+
+            return this;
         }
     }
 }

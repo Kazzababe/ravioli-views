@@ -378,16 +378,10 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
             return;
         }
         this.renderables.put(slot, renderable);
-        final ClickHandler<V, C> previous = this.clicks.get(slot);
-
-        if (previous == null) {
-            this.clicks.put(slot, clickHandler);
-        } else {
-            this.clicks.put(slot, (context) -> {
-                previous.accept(context);
-                clickHandler.accept(context);
-            });
-        }
+        this.clicks.merge(slot, clickHandler, (clickHandlerA, clickHandlerB) -> (context) -> {
+            clickHandlerA.accept(context);
+            clickHandlerB.accept(context);
+        });
     }
 
     /**
@@ -404,16 +398,10 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
     @Override
     public void set(final int slot, @NotNull final ViewRenderable renderable, @NotNull final ClickHandler<V, C> clickHandler) {
         this.renderables.put(slot, renderable);
-        final ClickHandler<V, C> previous = this.clicks.get(slot);
-
-        if (previous == null) {
-            this.clicks.put(slot, clickHandler);
-        } else {
-            this.clicks.put(slot, (ctx) -> {
-                previous.accept(ctx);
-                clickHandler.accept(ctx);
-            });
-        }
+        this.clicks.merge(slot, clickHandler, (clickHandlerA, clickHandlerB) -> (context) -> {
+            clickHandlerA.accept(context);
+            clickHandlerB.accept(context);
+        });
     }
 
     /**

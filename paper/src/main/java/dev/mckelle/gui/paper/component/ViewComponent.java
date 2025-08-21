@@ -3,6 +3,7 @@ package dev.mckelle.gui.paper.component;
 import dev.mckelle.gui.api.component.ViewComponentBase;
 import dev.mckelle.gui.paper.context.RenderContext;
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * An abstract base class that provides a convenient wrapper for creating view components
@@ -17,8 +18,10 @@ import org.bukkit.entity.Player;
 public abstract class ViewComponent<D> extends ViewComponentBase<Player, D, RenderContext<D>> {
     /**
      * Default constructor for ViewComponent.
+     *
+     * @param key The key for the component
      */
-    public ViewComponent() {
-        // Default constructor
+    public ViewComponent(@Nullable final String key) {
+        super(key);
     }
 }

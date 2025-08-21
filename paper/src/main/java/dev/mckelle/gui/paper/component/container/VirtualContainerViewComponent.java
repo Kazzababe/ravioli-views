@@ -106,12 +106,20 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
     /**
      * Creates a new virtual container component.
      *
+     * @param key       The key for the component.
      * @param width     The width of the container, in slots.
      * @param height    The height of the container, in slots.
      * @param handleRef A {@link Ref} that will be populated with the {@link Handle} for this container on first render.
      * @throws IllegalArgumentException if width or height are not greater than 0.
      */
-    public VirtualContainerViewComponent(final int width, final int height, @NotNull final Ref<Handle> handleRef) {
+    public VirtualContainerViewComponent(
+        @Nullable final String key,
+        final int width,
+        final int height,
+        @NotNull final Ref<Handle> handleRef
+    ) {
+        super(key);
+
         if (width <= 0 || height <= 0) {
             throw new IllegalArgumentException("width/height must be > 0");
         }
@@ -373,7 +381,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
      * Builder for {@link VirtualContainerViewComponent} that configures size, handle, filters,
      * change callbacks and initial items.
      */
-    public static final class Builder implements ViewComponentBase.Builder<VirtualContainerViewComponent> {
+    public static final class Builder implements ViewComponentBase.Builder<Builder, VirtualContainerViewComponent> {
         private Integer width;
         private Integer height;
         private Ref<Handle> handleRef;
@@ -381,6 +389,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
         private Consumer<ChangeEvent> onChange;
         private Map<Integer, ItemStack> initialItemsBySlot;
         private Function<Integer, ItemStack> initialItemSupplier;
+        private String key;
 
         /**
          * Creates a new Builder for {@link VirtualContainerViewComponent}.
@@ -476,7 +485,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
             if (this.handleRef == null) {
                 throw new IllegalStateException("handle(ref) is required");
             }
-            final VirtualContainerViewComponent component = new VirtualContainerViewComponent(this.width, this.height, this.handleRef);
+            final VirtualContainerViewComponent component = new VirtualContainerViewComponent(this.key, this.width, this.height, this.handleRef);
 
             component.filter(this.filter);
 
@@ -490,6 +499,16 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
                 component.initialItems(this.initialItemSupplier);
             }
             return component;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public @NotNull Builder key(@Nullable final String key) {
+            this.key = key;
+
+            return this;
         }
     }
 }

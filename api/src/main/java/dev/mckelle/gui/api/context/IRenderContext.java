@@ -359,7 +359,7 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
      */
     default <K, T extends ViewComponentBase<V, K, ?>> void set(
         final int slot,
-        @NotNull final ViewComponentBase.Builder<T> componentBuilder
+        @NotNull final ViewComponentBase.Builder<?, T> componentBuilder
     ) {
         this.set(slot, componentBuilder.build());
     }
@@ -383,7 +383,7 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
     default <K, T extends ViewComponentBase<V, K, ?>> void set(
         final int x,
         final int y,
-        @NotNull final ViewComponentBase.Builder<T> componentBuilder
+        @NotNull final ViewComponentBase.Builder<?, T> componentBuilder
     ) {
         this.set(x, y, componentBuilder.build());
     }
@@ -408,7 +408,7 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
     default <K, T extends ViewComponentBase<V, K, ?>> void set(
         final int x,
         final int y,
-        @NotNull final ViewComponentBase.Builder<T> componentBuilder,
+        @NotNull final ViewComponentBase.Builder<?, T> componentBuilder,
         @Nullable final K props
     ) {
         this.set(x, y, componentBuilder.build(), props);

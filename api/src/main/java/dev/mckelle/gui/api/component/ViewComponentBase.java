@@ -16,11 +16,22 @@ import org.jetbrains.annotations.Nullable;
  * @param <RC> type of the render context
  */
 public abstract class ViewComponentBase<V, D, RC extends IRenderContext<V, D, ?>> {
+    private final String key;
+
+    /**
+     * Create a new ViewComponentBase with a specified key.
+     *
+     * @param key The key for the component
+     */
+    public ViewComponentBase(@Nullable final String key) {
+        this.key = key;
+    }
+
     /**
      * Default constructor for IViewComponent.
      */
     public ViewComponentBase() {
-        // Default constructor
+        this(null);
     }
 
     /**
@@ -60,7 +71,7 @@ public abstract class ViewComponentBase<V, D, RC extends IRenderContext<V, D, ?>
      * @return a stable key string or null to auto-assign by render order
      */
     public @Nullable String key() {
-        return null;
+        return this.key;
     }
 
     /**
@@ -70,14 +81,24 @@ public abstract class ViewComponentBase<V, D, RC extends IRenderContext<V, D, ?>
      * a component and defer instantiation until render time.
      * </p>
      *
+     * @param <S> self-referencing generic
      * @param <T> concrete component type produced by this builder
      */
-    public interface Builder<T extends ViewComponentBase<?, ?, ?>> {
+    public interface Builder<S extends Builder<S, T>, T extends ViewComponentBase<?, ?, ?>> {
         /**
          * Create a new component instance from this builder's configuration.
          *
          * @return a new component instance; never {@code null}
          */
         @NotNull T build();
+
+        /**
+         * Set the key for the component. This should be unique when compared to all other components in the
+         * same render cycle.
+         *
+         * @param key unique key for the would be component; {@code null} to unset.
+         * @return the current builder instance
+         */
+        @NotNull S key(@Nullable String key);
     }
 }

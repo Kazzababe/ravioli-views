@@ -97,8 +97,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
          *
          * @param items      the items for the requested page (size 0..pageSize)
          * @param totalItems the total number of items across the full dataset
-         *
-         * @param <T> the item type produced as a result of the data loader
+         * @param <T>        the item type produced as a result of the data loader
          */
         record LoadResult<T>(@NotNull List<T> items, int totalItems) {
 
@@ -197,6 +196,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      * in the mask represents a slot that can display an item. Items are filled in
      * row-major order across the non-space slots.
      *
+     * @param key            The key for the component.
      * @param loader         A data loader that fetches items for a given page and page size, and invokes
      *                       the callback with the loaded items and the total number of items.
      * @param renderer       A function that transforms an item of type {@code T} into a {@link ViewRenderable}.
@@ -206,6 +206,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      * @param mask           The layout mask rows. All rows must have the same length.
      */
     public PaginatedContainerViewComponent(
+        @Nullable final String key,
         @NotNull final DataLoader<T> loader,
         @NotNull final CellRenderer<V, T> renderer,
         @Nullable final CellClick<V, T, CC> clickMapper,
@@ -213,6 +214,8 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         @Nullable final Executor loaderExecutor,
         @NotNull final String... mask
     ) {
+        super(key);
+
         if (mask.length == 0) {
             throw new IllegalArgumentException("mask must contain rows");
         }
@@ -235,23 +238,26 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
     /**
      * Convenience constructor without executor and click mapper.
      *
+     * @param key       The key for the component.
      * @param loader    data loader (page, pageSize, callback)
      * @param renderer  per-cell item renderer
      * @param handleRef ref that will receive the pagination handle
      * @param mask      character mask rows
      */
     public PaginatedContainerViewComponent(
+        @Nullable final String key,
         @NotNull final DataLoader<T> loader,
         @NotNull final CellRenderer<V, T> renderer,
         @NotNull final Ref<Handle> handleRef,
         @NotNull final String... mask
     ) {
-        this(loader, renderer, null, handleRef, null, mask);
+        this(key, loader, renderer, null, handleRef, null, mask);
     }
 
     /**
      * Convenience rectangular constructor with optional click mapper and executor.
      *
+     * @param key            The key for the component.
      * @param width          number of columns
      * @param height         number of rows
      * @param loader         data loader (page, pageSize, callback)
@@ -261,6 +267,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      * @param loaderExecutor optional executor to run the data loader (inline if {@code null})
      */
     public PaginatedContainerViewComponent(
+        @Nullable final String key,
         final int width,
         final int height,
         @NotNull final DataLoader<T> loader,
@@ -269,12 +276,13 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         @NotNull final Ref<Handle> handleRef,
         @Nullable final Executor loaderExecutor
     ) {
-        this(loader, renderer, clickMapper, handleRef, loaderExecutor, rectMask(width, height));
+        this(key, loader, renderer, clickMapper, handleRef, loaderExecutor, rectMask(width, height));
     }
 
     /**
      * Backwards-compatible rectangular constructor without click mapper and executor.
      *
+     * @param key       The key for the component.
      * @param width     number of columns
      * @param height    number of rows
      * @param loader    data loader (page, pageSize, callback)
@@ -282,13 +290,14 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      * @param handleRef ref that will receive the pagination handle
      */
     public PaginatedContainerViewComponent(
+        @Nullable final String key,
         final int width,
         final int height,
         @NotNull final DataLoader<T> loader,
         @NotNull final CellRenderer<V, T> renderer,
         @NotNull final Ref<Handle> handleRef
     ) {
-        this(loader, renderer, null, handleRef, null, rectMask(width, height));
+        this(key, loader, renderer, null, handleRef, null, rectMask(width, height));
     }
 
     private static @NotNull String[] rectMask(final int width, final int height) {
