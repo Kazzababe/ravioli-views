@@ -16,7 +16,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
-import java.util.function.Function;
 
 /**
  * A generic paginated container where a data-loader supplies items for each page.
@@ -156,13 +155,13 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      * in the mask represents a slot that can display an item. Items are filled in
      * row-major order across the non-space slots.
      *
-     * @param loader        A data loader that fetches items for a given page and page size, and invokes
-     *                      the callback with the loaded items and the total number of items.
-     * @param renderer      A function that transforms an item of type {@code T} into a {@link ViewRenderable}.
-     * @param clickMapper   Optional mapper that returns a click handler per item; may be {@code null} for no clicks.
-     * @param handleRef     A {@link Ref} that will be populated with the {@link Handle} on first render.
+     * @param loader         A data loader that fetches items for a given page and page size, and invokes
+     *                       the callback with the loaded items and the total number of items.
+     * @param renderer       A function that transforms an item of type {@code T} into a {@link ViewRenderable}.
+     * @param clickMapper    Optional mapper that returns a click handler per item; may be {@code null} for no clicks.
+     * @param handleRef      A {@link Ref} that will be populated with the {@link Handle} on first render.
      * @param loaderExecutor Optional executor to run the data loader on; if {@code null}, runs inline.
-     * @param mask          The layout mask rows. All rows must have the same length.
+     * @param mask           The layout mask rows. All rows must have the same length.
      */
     public PaginatedContainerViewComponent(
         @NotNull final DataLoader<T> loader,

@@ -1,7 +1,8 @@
 package dev.mckelle.gui.paper.component.container;
 
-import dev.mckelle.gui.api.state.Ref;
+import dev.mckelle.gui.api.component.IViewComponent;
 import dev.mckelle.gui.api.interaction.ClickHandler;
+import dev.mckelle.gui.api.state.Ref;
 import dev.mckelle.gui.paper.context.ClickContext;
 import dev.mckelle.gui.paper.context.RenderContext;
 import org.bukkit.entity.Player;
@@ -13,7 +14,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.ObjIntConsumer;
 
@@ -122,7 +122,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
      *
      * @param <T> the item type of the paginated container
      */
-    public static final class Builder<T> {
+    public static final class Builder<T> implements IViewComponent.Builder<PaginatedContainerViewComponent<T>> {
         private PaginatedContainerViewComponent.DataLoader<T> loader;
         private CellRenderer<Player, T> renderer;
         private PaginatedContainerViewComponent.CellClick<Player, T, ClickContext> clickMapper;
@@ -132,8 +132,11 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
         private Integer height;
         private Executor loaderExecutor;
 
-        /** Creates a new builder. */
-        public Builder() {}
+        /**
+         * Creates a new builder.
+         */
+        public Builder() {
+        }
 
         /**
          * Sets the data loader used to populate each page.
@@ -143,6 +146,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
          */
         public @NotNull Builder<T> loader(@NotNull final PaginatedContainerViewComponent.DataLoader<T> loader) {
             this.loader = loader;
+
             return this;
         }
 
@@ -154,6 +158,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
          */
         public @NotNull Builder<T> renderer(@NotNull final CellRenderer<Player, T> renderer) {
             this.renderer = renderer;
+
             return this;
         }
 
@@ -165,6 +170,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
          */
         public @NotNull Builder<T> clickMapper(@Nullable final PaginatedContainerViewComponent.CellClick<Player, T, ClickContext> mapper) {
             this.clickMapper = mapper;
+
             return this;
         }
 
@@ -176,6 +182,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
          */
         public @NotNull Builder<T> loaderExecutor(@NotNull final Executor executor) {
             this.loaderExecutor = executor;
+
             return this;
         }
 
@@ -189,6 +196,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
             this.loader = (page, pageSize, callback) -> {
                 final int from = page * pageSize;
                 final int to = Math.min(from + pageSize, fullList.size());
+
                 callback.accept(fullList.subList(from, to), fullList.size());
             };
             return this;
@@ -197,14 +205,15 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
         /**
          * Configures an asynchronous loader backed by a {@link CompletableFuture} and a total supplier.
          *
-         * @param asyncLoader          function that loads items asynchronously for the given page
-         * @param totalItemsSupplier   function that returns total number of items for the given page
+         * @param asyncLoader        function that loads items asynchronously for the given page
+         * @param totalItemsSupplier function that returns total number of items for the given page
          * @return this builder
          */
         public @NotNull Builder<T> async(@NotNull final Function<Integer, CompletableFuture<List<T>>> asyncLoader,
                                          @NotNull final Function<Integer, Integer> totalItemsSupplier) {
             this.loader = (page, pageSize, callback) ->
                 asyncLoader.apply(page).thenAccept(list -> callback.accept(list, totalItemsSupplier.apply(page)));
+
             return this;
         }
 
@@ -216,6 +225,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
          */
         public @NotNull Builder<T> map(@NotNull final BiConsumer<T, ClickContext> handler) {
             this.clickMapper = (value, index) -> (context) -> handler.accept(value, context);
+
             return this;
         }
 
@@ -226,7 +236,8 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
          * @return this builder
          */
         public @NotNull Builder<T> map(@NotNull final BiFunction<T, Integer, ClickHandler<Player, ClickContext>> factory) {
-            this.clickMapper = (value, index) -> factory.apply(value, index);
+            this.clickMapper = factory::apply;
+
             return this;
         }
 
@@ -238,6 +249,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
          */
         public @NotNull Builder<T> map(@NotNull final Function<T, Runnable> runnableMapper) {
             this.clickMapper = (value, index) -> (context) -> runnableMapper.apply(value).run();
+
             return this;
         }
 
@@ -249,6 +261,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
          */
         public @NotNull Builder<T> map(@NotNull final ObjIntConsumer<T> action) {
             this.clickMapper = (value, index) -> (context) -> action.accept(value, index);
+
             return this;
         }
 
@@ -260,6 +273,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
          */
         public @NotNull Builder<T> handle(@NotNull final Ref<Handle> handleRef) {
             this.handleRef = handleRef;
+
             return this;
         }
 
@@ -273,6 +287,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
             this.mask = mask;
             this.width = null;
             this.height = null;
+
             return this;
         }
 
@@ -287,6 +302,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
             this.width = width;
             this.height = height;
             this.mask = null;
+
             return this;
         }
 
@@ -296,6 +312,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
          * @return a new {@link PaginatedContainerViewComponent}
          * @throws IllegalStateException if required properties are missing
          */
+        @Override
         public @NotNull PaginatedContainerViewComponent<T> build() {
             if (this.loader == null) {
                 throw new IllegalStateException("loader is required");

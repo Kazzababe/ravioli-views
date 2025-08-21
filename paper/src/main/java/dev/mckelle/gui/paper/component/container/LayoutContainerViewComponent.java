@@ -1,5 +1,6 @@
 package dev.mckelle.gui.paper.component.container;
 
+import dev.mckelle.gui.api.component.IViewComponent;
 import dev.mckelle.gui.api.render.ViewRenderable;
 import dev.mckelle.gui.paper.context.ClickContext;
 import dev.mckelle.gui.paper.context.RenderContext;
@@ -63,7 +64,7 @@ public final class LayoutContainerViewComponent extends dev.mckelle.gui.core.com
      * Builder for {@link LayoutContainerViewComponent} that collects a mask
      * and constructs the component instance. Supports char-channel mappings.
      */
-    public static final class Builder {
+    public static final class Builder implements IViewComponent.Builder<LayoutContainerViewComponent> {
         private String[] mask;
         private final Map<Character, List<SlotConfigurer<Player, ClickContext>>> mappings = new HashMap<>();
 
@@ -164,6 +165,7 @@ public final class LayoutContainerViewComponent extends dev.mckelle.gui.core.com
          * @return a new layout container instance
          * @throws IllegalStateException if mask was not provided
          */
+        @Override
         public @NotNull LayoutContainerViewComponent build() {
             if (this.mask == null || this.mask.length == 0) {
                 throw new IllegalStateException("mask is required");

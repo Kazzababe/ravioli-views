@@ -62,4 +62,22 @@ public abstract class IViewComponent<V, D, RC extends IRenderContext<V, D, ?>> {
     public @Nullable String key() {
         return null;
     }
+
+    /**
+     * Factory for producing component instances of a specific type.
+     * <p>
+     * Builders are useful when an API needs to accept a configurable recipe for
+     * a component and defer instantiation until render time.
+     * </p>
+     *
+     * @param <T> concrete component type produced by this builder
+     */
+    public interface Builder<T extends IViewComponent<?, ?, ?>> {
+        /**
+         * Create a new component instance from this builder's configuration.
+         *
+         * @return a new component instance; never {@code null}
+         */
+        @NotNull T build();
+    }
 }

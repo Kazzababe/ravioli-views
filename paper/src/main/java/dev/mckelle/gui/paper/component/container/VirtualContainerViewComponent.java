@@ -1,6 +1,7 @@
 package dev.mckelle.gui.paper.component.container;
 
 import com.google.common.base.Predicates;
+import dev.mckelle.gui.api.component.IViewComponent;
 import dev.mckelle.gui.api.context.IRenderContext;
 import dev.mckelle.gui.api.render.ViewRenderable;
 import dev.mckelle.gui.api.state.Ref;
@@ -372,7 +373,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
      * Builder for {@link VirtualContainerViewComponent} that configures size, handle, filters,
      * change callbacks and initial items.
      */
-    public static final class Builder {
+    public static final class Builder implements IViewComponent.Builder<VirtualContainerViewComponent> {
         private Integer width;
         private Integer height;
         private Ref<Handle> handleRef;
@@ -467,6 +468,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
          * @return a new VirtualContainerViewComponent instance
          * @throws IllegalStateException if required configuration is missing
          */
+        @Override
         public @NotNull VirtualContainerViewComponent build() {
             if (this.width == null || this.height == null) {
                 throw new IllegalStateException("size(width,height) is required");

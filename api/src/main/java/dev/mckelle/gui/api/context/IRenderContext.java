@@ -343,6 +343,78 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
     );
 
     /**
+     * Builds and renders a child component at the given slot.
+     * <p>
+     * The supplied builder is invoked immediately to produce a component instance, which is then
+     * rendered with its own render context for nested layout.
+     * </p>
+     * <p>
+     * Equivalent to {@code set(slot, componentBuilder.build())}.
+     * </p>
+     *
+     * @param slot             0-based linear slot index (row-major order)
+     * @param componentBuilder factory that produces the child component to render
+     * @param <K>              type of props for the nested component
+     * @param <T>              concrete component type produced by the builder
+     */
+    default <K, T extends IViewComponent<V, K, ?>> void set(
+        final int slot,
+        @NotNull final IViewComponent.Builder<T> componentBuilder
+    ) {
+        this.set(slot, componentBuilder.build());
+    }
+
+    /**
+     * Builds and renders a child component at the given grid coordinates.
+     * <p>
+     * The supplied builder is invoked immediately to produce a component instance, which is then
+     * rendered with its own render context for nested layout.
+     * </p>
+     * <p>
+     * Equivalent to {@code set(x, y, componentBuilder.build())}.
+     * </p>
+     *
+     * @param x                0-based column index
+     * @param y                0-based row index
+     * @param componentBuilder factory that produces the child component to render
+     * @param <K>              type of props for the nested component
+     * @param <T>              concrete component type produced by the builder
+     */
+    default <K, T extends IViewComponent<V, K, ?>> void set(
+        final int x,
+        final int y,
+        @NotNull final IViewComponent.Builder<T> componentBuilder
+    ) {
+        this.set(x, y, componentBuilder.build());
+    }
+
+    /**
+     * Builds and renders a child component at the given coordinates with provided props.
+     * <p>
+     * The supplied builder is invoked immediately to produce a component instance. The given {@code props}
+     * are then forwarded to the nested component during rendering.
+     * </p>
+     * <p>
+     * Equivalent to {@code set(x, y, componentBuilder.build(), props)}.
+     * </p>
+     *
+     * @param x                0-based column index
+     * @param y                0-based row index
+     * @param componentBuilder factory that produces the child component to render
+     * @param props            optional props to pass into the child component
+     * @param <K>              type of props
+     * @param <T>              concrete component type produced by the builder
+     */
+    default <K, T extends IViewComponent<V, K, ?>> void set(
+        final int x,
+        final int y,
+        @NotNull final IViewComponent.Builder<T> componentBuilder,
+        @Nullable final K props
+    ) {
+        this.set(x, y, componentBuilder.build(), props);
+    }
+
+    /**
      * Renders a static ViewRenderable (e.g., an item) at grid coordinates.
      *
      * @param x          0-based column index
