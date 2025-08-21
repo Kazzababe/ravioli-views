@@ -15,11 +15,11 @@ import org.jetbrains.annotations.Nullable;
  * @param <D>  type of optional props supplied when rendering this component
  * @param <RC> type of the render context
  */
-public abstract class IViewComponent<V, D, RC extends IRenderContext<V, D, ?>> {
+public abstract class ViewComponentBase<V, D, RC extends IRenderContext<V, D, ?>> {
     /**
      * Default constructor for IViewComponent.
      */
-    public IViewComponent() {
+    public ViewComponentBase() {
         // Default constructor
     }
 
@@ -72,7 +72,7 @@ public abstract class IViewComponent<V, D, RC extends IRenderContext<V, D, ?>> {
      *
      * @param <T> concrete component type produced by this builder
      */
-    public interface Builder<T extends IViewComponent<?, ?, ?>> {
+    public interface Builder<T extends ViewComponentBase<?, ?, ?>> {
         /**
          * Create a new component instance from this builder's configuration.
          *

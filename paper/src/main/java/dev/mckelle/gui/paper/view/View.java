@@ -1,6 +1,6 @@
 package dev.mckelle.gui.paper.view;
 
-import dev.mckelle.gui.api.IView;
+import dev.mckelle.gui.api.ViewBase;
 import dev.mckelle.gui.paper.context.ClickContext;
 import dev.mckelle.gui.paper.context.CloseContext;
 import dev.mckelle.gui.paper.context.InitContext;
@@ -13,13 +13,13 @@ import org.jetbrains.annotations.NotNull;
  * Abstract base class for Paper/Spigot GUI views.
  * <p>
  * This class provides a convenient base for creating GUI views that work with
- * Bukkit players. It implements the {@link IView} interface with Paper-specific context types
+ * Bukkit players. It implements the {@link ViewBase} interface with Paper-specific context types
  * and provides default empty implementations for the lifecycle methods.
  * </p>
  *
  * @param <D> The type of data/props passed to the view.
  */
-public abstract class View<D> extends IView<
+public abstract class View<D> extends ViewBase<
     Player,
     D,
     ClickContext,

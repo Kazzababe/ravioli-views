@@ -1,7 +1,7 @@
 package dev.mckelle.gui.paper.component.container;
 
 import com.google.common.base.Predicates;
-import dev.mckelle.gui.api.component.IViewComponent;
+import dev.mckelle.gui.api.component.ViewComponentBase;
 import dev.mckelle.gui.api.context.IRenderContext;
 import dev.mckelle.gui.api.render.ViewRenderable;
 import dev.mckelle.gui.api.state.Ref;
@@ -373,7 +373,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
      * Builder for {@link VirtualContainerViewComponent} that configures size, handle, filters,
      * change callbacks and initial items.
      */
-    public static final class Builder implements IViewComponent.Builder<VirtualContainerViewComponent> {
+    public static final class Builder implements ViewComponentBase.Builder<VirtualContainerViewComponent> {
         private Integer width;
         private Integer height;
         private Ref<Handle> handleRef;

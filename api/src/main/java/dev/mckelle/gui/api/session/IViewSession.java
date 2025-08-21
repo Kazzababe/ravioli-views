@@ -1,6 +1,6 @@
 package dev.mckelle.gui.api.session;
 
-import dev.mckelle.gui.api.IView;
+import dev.mckelle.gui.api.ViewBase;
 import dev.mckelle.gui.api.schedule.Scheduler;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -37,7 +37,7 @@ public interface IViewSession<V, D> {
      * @return the root View instance; never null
      */
     @NotNull
-    IView<V, D, ?, ?, ?, ?> getRoot();
+    ViewBase<V, D, ?, ?, ?, ?> getRoot();
 
     /**
      * Attaches a scheduled task to this session so that it will be

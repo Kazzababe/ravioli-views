@@ -1,6 +1,6 @@
 package dev.mckelle.gui.api.render;
 
-import dev.mckelle.gui.api.IView;
+import dev.mckelle.gui.api.ViewBase;
 import dev.mckelle.gui.api.reconciliation.Patch;
 import dev.mckelle.gui.api.session.IViewSession;
 import org.jetbrains.annotations.NotNull;
@@ -14,7 +14,7 @@ import org.jetbrains.annotations.Nullable;
  * @param <D>  type of the data/props passed to the view
  * @param <V2> type of the root view (must extend IView)
  */
-public interface Renderer<V, D, V2 extends IView<V, D, ?, ?, ?, ?>> {
+public interface Renderer<V, D, V2 extends ViewBase<V, D, ?, ?, ?, ?>> {
     /**
      * <p>
      * Mounts the root view for a given viewer, creating any necessary UI elements

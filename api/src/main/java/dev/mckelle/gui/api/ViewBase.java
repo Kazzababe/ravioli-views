@@ -17,7 +17,7 @@ import org.jetbrains.annotations.NotNull;
  * @param <IC> type of the init context
  * @param <RC> type of the render context
  */
-public abstract class IView<
+public abstract class ViewBase<
     V,
     D,
     CC extends IClickContext<V>,
@@ -28,7 +28,7 @@ public abstract class IView<
     /**
      * Default constructor for IView.
      */
-    public IView() {
+    public ViewBase() {
         // Default constructor
     }
 

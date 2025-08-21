@@ -1,6 +1,6 @@
 package dev.mckelle.gui.core.component;
 
-import dev.mckelle.gui.api.component.IViewComponent;
+import dev.mckelle.gui.api.component.ViewComponentBase;
 import dev.mckelle.gui.api.context.IClickContext;
 import dev.mckelle.gui.api.context.IRenderContext;
 import dev.mckelle.gui.api.interaction.ClickHandler;
@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
 
@@ -29,7 +30,7 @@ import java.util.function.BiConsumer;
  * @param <CC> The click context type.
  * @param <RC> The render context type.
  */
-public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, RC extends IRenderContext<V, Void, CC>> extends IViewComponent<V, Void, RC> {
+public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, RC extends IRenderContext<V, Void, CC>> extends ViewComponentBase<V, Void, RC> {
 
     /**
      * Loader interface for supplying items for a specific page and page size.
@@ -61,6 +62,47 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
          *                 number of items across all pages
          */
         void load(int page, int pageSize, BiConsumer<List<T>, Integer> callback);
+    }
+
+    /**
+     * Asynchronous loader interface that supplies items for a specific page and page size.
+     * <p>
+     * The loader is invoked with the requested {@code page} and computed {@code pageSize}. It must complete
+     * the returned {@link CompletableFuture} with a {@link LoadResult} containing:
+     * </p>
+     * <ul>
+     *   <li>{@code items}: the list of items for the requested page (size 0..pageSize)</li>
+     *   <li>{@code totalItems}: the total number of items across the full dataset</li>
+     * </ul>
+     * <p>
+     * The paginated container computes total pages via {@code ceil(totalItems / (double) pageSize)}.
+     * </p>
+     *
+     * @param <T> the item type produced by the loader
+     */
+    @FunctionalInterface
+    public interface AsyncDataLoader<T> {
+        /**
+         * Loads and returns the items and total count for the requested page and page size.
+         *
+         * @param page     the 0-based page index to load
+         * @param pageSize the maximum number of items that should be returned for this page
+         *                 (derived from the mask or width×height)
+         * @return a future that completes with the {@link LoadResult}
+         */
+        @NotNull CompletableFuture<LoadResult<T>> load(int page, int pageSize);
+
+        /**
+         * Result payload returned by {@link AsyncDataLoader#load(int, int)}.
+         *
+         * @param items      the items for the requested page (size 0..pageSize)
+         * @param totalItems the total number of items across the full dataset
+         *
+         * @param <T> the item type produced as a result of the data loader
+         */
+        record LoadResult<T>(@NotNull List<T> items, int totalItems) {
+
+        }
     }
 
     /**

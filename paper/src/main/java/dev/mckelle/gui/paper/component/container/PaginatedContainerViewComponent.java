@@ -1,6 +1,6 @@
 package dev.mckelle.gui.paper.component.container;
 
-import dev.mckelle.gui.api.component.IViewComponent;
+import dev.mckelle.gui.api.component.ViewComponentBase;
 import dev.mckelle.gui.api.interaction.ClickHandler;
 import dev.mckelle.gui.api.state.Ref;
 import dev.mckelle.gui.paper.context.ClickContext;
@@ -122,7 +122,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
      *
      * @param <T> the item type of the paginated container
      */
-    public static final class Builder<T> implements IViewComponent.Builder<PaginatedContainerViewComponent<T>> {
+    public static final class Builder<T> implements ViewComponentBase.Builder<PaginatedContainerViewComponent<T>> {
         private PaginatedContainerViewComponent.DataLoader<T> loader;
         private CellRenderer<Player, T> renderer;
         private PaginatedContainerViewComponent.CellClick<Player, T, ClickContext> clickMapper;
@@ -203,16 +203,34 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
         }
 
         /**
-         * Configures an asynchronous loader backed by a {@link CompletableFuture} and a total supplier.
+         * Configures an asynchronous data loader that receives both the current page and computed page size.
+         * <p>
+         * Use this when your data source can optimize by the requested {@code pageSize} (e.g., LIMIT/OFFSET queries or
+         * remote APIs that accept a page size). The supplied {@link AsyncDataLoader} must return a
+         * {@link CompletableFuture} that completes with a {@link AsyncDataLoader.LoadResult} containing:
+         * </p>
+         * <ul>
+         *   <li>items: the list of items for the requested page (size 0..pageSize)</li>
+         *   <li>totalItems: the total number of items across the full dataset</li>
+         * </ul>
+         * <p>
+         * The total number of pages is computed as {@code ceil(totalItems / (double) pageSize)}.
+         * </p>
          *
-         * @param asyncLoader        function that loads items asynchronously for the given page
-         * @param totalItemsSupplier function that returns total number of items for the given page
+         * @param asyncDataLoader asynchronous loader that returns items and total count for (page, pageSize)
          * @return this builder
          */
-        public @NotNull Builder<T> async(@NotNull final Function<Integer, CompletableFuture<List<T>>> asyncLoader,
-                                         @NotNull final Function<Integer, Integer> totalItemsSupplier) {
+        public @NotNull Builder<T> async(
+            @NotNull final AsyncDataLoader<T> asyncDataLoader
+        ) {
             this.loader = (page, pageSize, callback) ->
-                asyncLoader.apply(page).thenAccept(list -> callback.accept(list, totalItemsSupplier.apply(page)));
+                asyncDataLoader.load(page, pageSize)
+                    .thenAccept((result) ->
+                        callback.accept(
+                            result.items(),
+                            result.totalItems()
+                        )
+                    );
 
             return this;
         }

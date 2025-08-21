@@ -1,7 +1,7 @@
 package dev.mckelle.gui.api.context;
 
-import dev.mckelle.gui.api.IView;
-import dev.mckelle.gui.api.component.IViewComponent;
+import dev.mckelle.gui.api.ViewBase;
+import dev.mckelle.gui.api.component.ViewComponentBase;
 import dev.mckelle.gui.api.interaction.ClickHandler;
 import dev.mckelle.gui.api.render.ViewRenderable;
 import dev.mckelle.gui.api.schedule.Scheduler;
@@ -306,7 +306,7 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
      */
     <K> void set(
         int slot,
-        @NotNull IViewComponent<V, K, ?> component
+        @NotNull ViewComponentBase<V, K, ?> component
     );
 
     /**
@@ -321,7 +321,7 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
     default <K> void set(
         final int x,
         final int y,
-        @NotNull final IViewComponent<V, K, ?> component
+        @NotNull final ViewComponentBase<V, K, ?> component
     ) {
         this.set(x, y, component, null);
     }
@@ -338,7 +338,7 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
     <K> void set(
         int x,
         int y,
-        @NotNull IViewComponent<V, K, ?> component,
+        @NotNull ViewComponentBase<V, K, ?> component,
         @Nullable K props
     );
 
@@ -357,9 +357,9 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
      * @param <K>              type of props for the nested component
      * @param <T>              concrete component type produced by the builder
      */
-    default <K, T extends IViewComponent<V, K, ?>> void set(
+    default <K, T extends ViewComponentBase<V, K, ?>> void set(
         final int slot,
-        @NotNull final IViewComponent.Builder<T> componentBuilder
+        @NotNull final ViewComponentBase.Builder<T> componentBuilder
     ) {
         this.set(slot, componentBuilder.build());
     }
@@ -380,10 +380,10 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
      * @param <K>              type of props for the nested component
      * @param <T>              concrete component type produced by the builder
      */
-    default <K, T extends IViewComponent<V, K, ?>> void set(
+    default <K, T extends ViewComponentBase<V, K, ?>> void set(
         final int x,
         final int y,
-        @NotNull final IViewComponent.Builder<T> componentBuilder
+        @NotNull final ViewComponentBase.Builder<T> componentBuilder
     ) {
         this.set(x, y, componentBuilder.build());
     }
@@ -405,10 +405,10 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
      * @param <K>              type of props
      * @param <T>              concrete component type produced by the builder
      */
-    default <K, T extends IViewComponent<V, K, ?>> void set(
+    default <K, T extends ViewComponentBase<V, K, ?>> void set(
         final int x,
         final int y,
-        @NotNull final IViewComponent.Builder<T> componentBuilder,
+        @NotNull final ViewComponentBase.Builder<T> componentBuilder,
         @Nullable final K props
     ) {
         this.set(x, y, componentBuilder.build(), props);
@@ -538,7 +538,7 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
 
     /**
      * Returns the width of the view this component is rendering within or the view itself if called within the
-     * root {@link IView#render}.
+     * root {@link ViewBase#render}.
      *
      * @return the width of view
      */
@@ -546,7 +546,7 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
 
     /**
      * Returns the height of the view this component is rendering within or the view itself if called within the
-     * root {@link IView#render}.
+     * root {@link ViewBase#render}.
      *
      * @return the height of view
      */

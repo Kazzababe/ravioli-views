@@ -1,6 +1,6 @@
 package dev.mckelle.gui.core.component;
 
-import dev.mckelle.gui.api.component.IViewComponent;
+import dev.mckelle.gui.api.component.ViewComponentBase;
 import dev.mckelle.gui.api.context.IClickContext;
 import dev.mckelle.gui.api.context.IRenderContext;
 import dev.mckelle.gui.api.interaction.ClickHandler;
@@ -60,7 +60,7 @@ import java.util.function.IntFunction;
  * @param <RC> render context type
  * @param <S>  self-referencing type for method chaining
  */
-public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC extends IRenderContext<V, Void, CC>, S extends LayoutContainerViewComponent<V, CC, RC, S>> extends IViewComponent<V, Void, RC> {
+public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC extends IRenderContext<V, Void, CC>, S extends LayoutContainerViewComponent<V, CC, RC, S>> extends ViewComponentBase<V, Void, RC> {
 
     /**
      * Builder interface for configuring individual slots in the layout.

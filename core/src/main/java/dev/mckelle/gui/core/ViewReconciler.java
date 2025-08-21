@@ -1,6 +1,6 @@
 package dev.mckelle.gui.core;
 
-import dev.mckelle.gui.api.IView;
+import dev.mckelle.gui.api.ViewBase;
 import dev.mckelle.gui.api.context.IRenderContext;
 import dev.mckelle.gui.api.interaction.ClickHandler;
 import dev.mckelle.gui.api.reconciliation.Patch;
@@ -97,7 +97,7 @@ public final class ViewReconciler<V> {
             this::render
         );
 
-        ((IView) this.instance.getRoot()).render(renderContext);
+        ((ViewBase) this.instance.getRoot()).render(renderContext);
 
         final Set<String> unmountedKeys = new HashSet<>(this.prevVisitedKeys);
 

@@ -1,6 +1,6 @@
 package dev.mckelle.gui.core;
 
-import dev.mckelle.gui.api.IView;
+import dev.mckelle.gui.api.ViewBase;
 import dev.mckelle.gui.api.reconciliation.Patch;
 import dev.mckelle.gui.api.render.Renderer;
 import dev.mckelle.gui.api.render.ViewRenderable;
@@ -20,7 +20,7 @@ import org.jetbrains.annotations.NotNull;
  * @param <K>  the platform-specific item type (e.g., ItemStack for Bukkit)
  * @param <V2> the view type
  */
-public abstract class AbstractInventoryRenderer<V, D, K, V2 extends IView<V, D, ?, ?, ?, ?>> implements Renderer<V, D, V2> {
+public abstract class AbstractInventoryRenderer<V, D, K, V2 extends ViewBase<V, D, ?, ?, ?, ?>> implements Renderer<V, D, V2> {
     /**
      * Default constructor for AbstractInventoryRenderer.
      */

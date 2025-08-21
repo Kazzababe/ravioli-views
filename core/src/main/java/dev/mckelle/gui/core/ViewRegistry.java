@@ -1,6 +1,6 @@
 package dev.mckelle.gui.core;
 
-import dev.mckelle.gui.api.IView;
+import dev.mckelle.gui.api.ViewBase;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * that can be accessed by their class type.
  */
 public final class ViewRegistry {
-    private final Map<Class<? extends IView<?, ?, ?, ?, ?, ?>>, IView<?, ?, ?, ?, ?, ?>> registeredViews = new ConcurrentHashMap<>();
+    private final Map<Class<? extends ViewBase<?, ?, ?, ?, ?, ?>>, ViewBase<?, ?, ?, ?, ?, ?>> registeredViews = new ConcurrentHashMap<>();
 
     /**
      * Default constructor for ViewRegistry.
@@ -29,8 +29,8 @@ public final class ViewRegistry {
      * @param <T>  the view type
      */
     @SuppressWarnings("unchecked")
-    public <V, T extends IView<V, ?, ?, ?, ?, ?>> void registerView(final T view) {
-        this.registeredViews.put((Class<? extends IView<?, ?, ?, ?, ?, ?>>) view.getClass(), view);
+    public <V, T extends ViewBase<V, ?, ?, ?, ?, ?>> void registerView(final T view) {
+        this.registeredViews.put((Class<? extends ViewBase<?, ?, ?, ?, ?, ?>>) view.getClass(), view);
     }
 
     /**
@@ -42,7 +42,7 @@ public final class ViewRegistry {
      * @return the registered view instance, or null if not found
      */
     @SuppressWarnings("unchecked")
-    public <V, T extends IView<V, ?, ?, ?, ?, ?>> T getView(final Class<T> clazz) {
+    public <V, T extends ViewBase<V, ?, ?, ?, ?, ?>> T getView(final Class<T> clazz) {
         return (T) this.registeredViews.get(clazz);
     }
 }

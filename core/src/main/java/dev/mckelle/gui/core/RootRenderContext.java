@@ -1,6 +1,6 @@
 package dev.mckelle.gui.core;
 
-import dev.mckelle.gui.api.component.IViewComponent;
+import dev.mckelle.gui.api.component.ViewComponentBase;
 import dev.mckelle.gui.api.context.IClickContext;
 import dev.mckelle.gui.api.context.IRenderContext;
 import dev.mckelle.gui.api.interaction.ClickHandler;
@@ -318,7 +318,7 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
      * {@inheritDoc}
      */
     @Override
-    public <K> void set(final int slot, @NotNull final IViewComponent<V, K, ?> component) {
+    public <K> void set(final int slot, @NotNull final ViewComponentBase<V, K, ?> component) {
         final int localX = slot % this.width;
         final int localY = slot / this.width;
 
@@ -332,7 +332,7 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
     public <K> void set(
         final int x,
         final int y,
-        @NotNull final IViewComponent<V, K, ?> component,
+        @NotNull final ViewComponentBase<V, K, ?> component,
         @Nullable final K props
     ) {
         final String slotSeg = "slot[" + x + "," + y + "]";
@@ -658,8 +658,8 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
          * @param component The component to render.
          */
         @SuppressWarnings({"unchecked", "rawtypes"})
-        public void renderComponent(final @NotNull IViewComponent<V, K, ?> component) {
-            ((IViewComponent) component).render(this);
+        public void renderComponent(final @NotNull ViewComponentBase<V, K, ?> component) {
+            ((ViewComponentBase) component).render(this);
         }
 
         /**
@@ -860,7 +860,7 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
          * {@inheritDoc}
          */
         @Override
-        public <L> void set(final int slot, @NotNull final IViewComponent<V, L, ?> component) {
+        public <L> void set(final int slot, @NotNull final ViewComponentBase<V, L, ?> component) {
             final int mappedSlot = this.mapSlot(slot);
 
             if (mappedSlot != -1) {
@@ -872,7 +872,7 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
          * {@inheritDoc}
          */
         @Override
-        public <L> void set(final int x, final int y, @NotNull final IViewComponent<V, L, ?> component, @Nullable final L props) {
+        public <L> void set(final int x, final int y, @NotNull final ViewComponentBase<V, L, ?> component, @Nullable final L props) {
             if (this.inBounds(x, y)) {
                 RootRenderContext.this.set(this.mapX(x), this.mapY(y), component, props);
             }
