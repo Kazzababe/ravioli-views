@@ -358,4 +358,136 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
     ) {
 
     }
+
+    /**
+     * Starts a fluent builder for {@link VirtualContainerViewComponent}.
+     *
+     * @return a new Builder instance
+     */
+    public static @NotNull Builder builder() {
+        return new Builder();
+    }
+
+    /**
+     * Builder for {@link VirtualContainerViewComponent} that configures size, handle, filters,
+     * change callbacks and initial items.
+     */
+    public static final class Builder {
+        private Integer width;
+        private Integer height;
+        private Ref<Handle> handleRef;
+        private Predicate<ItemStack> filter = Predicates.alwaysTrue();
+        private Consumer<ChangeEvent> onChange;
+        private Map<Integer, ItemStack> initialItemsBySlot;
+        private Function<Integer, ItemStack> initialItemSupplier;
+
+        /**
+         * Creates a new Builder for {@link VirtualContainerViewComponent}.
+         */
+        public Builder() {
+        }
+
+        /**
+         * Sets the container size in slots.
+         *
+         * @param width  number of columns
+         * @param height number of rows
+         * @return this builder
+         */
+        public @NotNull Builder size(final int width, final int height) {
+            this.width = width;
+            this.height = height;
+
+            return this;
+        }
+
+        /**
+         * Sets the handle reference that will receive the imperative API.
+         *
+         * @param handleRef reference that will be populated with the container handle
+         * @return this builder
+         */
+        public @NotNull Builder handle(@NotNull final Ref<Handle> handleRef) {
+            this.handleRef = handleRef;
+
+            return this;
+        }
+
+        /**
+         * Sets the per-slot item filter.
+         *
+         * @param filter predicate that returns true for allowed ItemStacks
+         * @return this builder
+         */
+        public @NotNull Builder filter(@NotNull final Predicate<ItemStack> filter) {
+            this.filter = filter;
+
+            return this;
+        }
+
+        /**
+         * Sets the change callback invoked when a slot contents change.
+         *
+         * @param onChange consumer invoked on each successful change
+         * @return this builder
+         */
+        public @NotNull Builder onChange(@NotNull final Consumer<ChangeEvent> onChange) {
+            this.onChange = onChange;
+
+            return this;
+        }
+
+        /**
+         * Sets initial items using a slot->item map.
+         *
+         * @param itemsBySlot map of local slot index to ItemStack
+         * @return this builder
+         */
+        public @NotNull Builder initialItems(@NotNull final Map<Integer, ItemStack> itemsBySlot) {
+            this.initialItemsBySlot = itemsBySlot;
+
+            return this;
+        }
+
+        /**
+         * Sets initial items using a slot-based supplier.
+         *
+         * @param itemSupplier function from local slot index to ItemStack
+         * @return this builder
+         */
+        public @NotNull Builder initialItems(@NotNull final Function<Integer, ItemStack> itemSupplier) {
+            this.initialItemSupplier = itemSupplier;
+
+            return this;
+        }
+
+        /**
+         * Builds the {@link VirtualContainerViewComponent}.
+         *
+         * @return a new VirtualContainerViewComponent instance
+         * @throws IllegalStateException if required configuration is missing
+         */
+        public @NotNull VirtualContainerViewComponent build() {
+            if (this.width == null || this.height == null) {
+                throw new IllegalStateException("size(width,height) is required");
+            }
+            if (this.handleRef == null) {
+                throw new IllegalStateException("handle(ref) is required");
+            }
+            final VirtualContainerViewComponent component = new VirtualContainerViewComponent(this.width, this.height, this.handleRef);
+
+            component.filter(this.filter);
+
+            if (this.onChange != null) {
+                component.onChange(this.onChange);
+            }
+            if (this.initialItemsBySlot != null) {
+                component.initialItems(this.initialItemsBySlot);
+            }
+            if (this.initialItemSupplier != null) {
+                component.initialItems(this.initialItemSupplier);
+            }
+            return component;
+        }
+    }
 }

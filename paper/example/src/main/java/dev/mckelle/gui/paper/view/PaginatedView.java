@@ -1,6 +1,7 @@
 package dev.mckelle.gui.paper.view;
 
 import dev.mckelle.gui.api.state.Ref;
+import dev.mckelle.gui.paper.PaperComponents;
 import dev.mckelle.gui.paper.component.container.PaginatedContainerViewComponent;
 import dev.mckelle.gui.paper.context.InitContext;
 import dev.mckelle.gui.paper.context.RenderContext;
@@ -32,8 +33,8 @@ public final class PaginatedView extends View<Object> {
         };
         context.set(
             0,
-            new PaginatedContainerViewComponent<String>(
-                (page, pageSize, callback) -> {
+            PaperComponents.<String>paginated()
+                .loader((page, pageSize, callback) -> {
                     final int totalItems = (int) Math.round(pageSize * 2.5);
                     final int startIndex = page * pageSize;
 
@@ -51,17 +52,17 @@ public final class PaginatedView extends View<Object> {
                         items.add("Item " + (i + 1));
                     }
                     callback.accept(items, totalItems);
-                },
-                (data, index) -> {
+                })
+                .renderer((data, index) -> {
                     final ItemStack itemStack = new ItemStack(Material.PLAYER_HEAD);
 
                     itemStack.editMeta((itemMeta) -> itemMeta.displayName(Component.text(data)));
 
                     return item(itemStack);
-                },
-                paginationHandle,
-                mask
-            )
+                })
+                .handle(paginationHandle)
+                .mask(mask)
+                .build()
         );
         context.set(
             0,

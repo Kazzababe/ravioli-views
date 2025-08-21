@@ -3,8 +3,8 @@ package dev.mckelle.gui.core.component;
 import dev.mckelle.gui.api.component.IViewComponent;
 import dev.mckelle.gui.api.context.IClickContext;
 import dev.mckelle.gui.api.context.IRenderContext;
-import dev.mckelle.gui.api.render.ViewRenderable;
 import dev.mckelle.gui.api.interaction.ClickHandler;
+import dev.mckelle.gui.api.render.ViewRenderable;
 import dev.mckelle.gui.api.state.Ref;
 import dev.mckelle.gui.api.state.State;
 import org.jetbrains.annotations.NotNull;
@@ -54,12 +54,12 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
          * {@code ceil(totalItems / (double) pageSize)}.
          * </p>
          *
-         * @param page       the 0-based page index to load
-         * @param pageSize   the maximum number of items that should be returned for this page
-         *                   (derived from the mask or width×height)
-         * @param callback   a consumer that must be invoked with the list of items for the
-         *                   requested page (size 0..pageSize) and {@code totalItems}, the total
-         *                   number of items across all pages
+         * @param page     the 0-based page index to load
+         * @param pageSize the maximum number of items that should be returned for this page
+         *                 (derived from the mask or width×height)
+         * @param callback a consumer that must be invoked with the list of items for the
+         *                 requested page (size 0..pageSize) and {@code totalItems}, the total
+         *                 number of items across all pages
          */
         void load(int page, int pageSize, BiConsumer<List<T>, Integer> callback);
     }
@@ -209,13 +209,13 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      * Backwards-compatible constructor that builds a full rectangular mask of size
      * width x height where every slot is used.
      *
-     * @param width     The number of columns in the container.
-     * @param height    The number of rows in the container.
-     * @param loader    A data loader that fetches items for a given page and page size, and invokes
-     *                  the callback with the loaded items and the total number of items.
-     * @param renderer  A function that transforms an item of type {@code T} into a {@link ViewRenderable}.
+     * @param width       The number of columns in the container.
+     * @param height      The number of rows in the container.
+     * @param loader      A data loader that fetches items for a given page and page size, and invokes
+     *                    the callback with the loaded items and the total number of items.
+     * @param renderer    A function that transforms an item of type {@code T} into a {@link ViewRenderable}.
      * @param clickMapper Optional mapper that returns a click handler per item; may be {@code null} for no clicks.
-     * @param handleRef A {@link Ref} that will be populated with the {@link Handle} on first render.
+     * @param handleRef   A {@link Ref} that will be populated with the {@link Handle} on first render.
      */
     public PaginatedContainerViewComponent(
         final int width,
@@ -426,7 +426,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      * @param <T>      The item type.
      * @param <CC>     The click context type.
      * @param <RC>     The render context type.
-     * @return         A new paginated container component configured for synchronous pagination.
+     * @return A new paginated container component configured for synchronous pagination.
      */
     public static <V, T, CC extends IClickContext<V>, RC extends IRenderContext<V, Void, CC>> PaginatedContainerViewComponent<V, T, CC, RC> sync(
         @NotNull final String[] mask,
