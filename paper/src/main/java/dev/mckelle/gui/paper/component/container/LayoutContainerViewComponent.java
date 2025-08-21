@@ -133,18 +133,6 @@ public final class LayoutContainerViewComponent extends dev.mckelle.gui.core.com
         }
 
         /**
-         * Maps a character to a renderable provider and a simple index-aware click action.
-         *
-         * @param ch             the layout channel character
-         * @param renderable     provider based on occurrence index
-         * @param onClickByIndex provider of a Runnable click action by occurrence index
-         * @return this builder
-         */
-        public @NotNull Builder map(final char ch, @NotNull final IntFunction<ViewRenderable> renderable, @NotNull final IntFunction<Runnable> onClickByIndex) {
-            return this.map(ch, (index, x, y, slot) -> slot.item(renderable.apply(index)).onClick((ctx) -> onClickByIndex.apply(index).run()));
-        }
-
-        /**
          * Maps a character to a renderable provider and a click handler that receives the click context.
          *
          * @param ch             the layout channel character
