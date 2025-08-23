@@ -5,6 +5,8 @@ import dev.mckelle.gui.api.context.IClickContext;
 import dev.mckelle.gui.api.context.IRenderContext;
 import dev.mckelle.gui.api.interaction.ClickHandler;
 import dev.mckelle.gui.api.render.ViewRenderable;
+import dev.mckelle.gui.api.state.BooleanRef;
+import dev.mckelle.gui.api.state.BooleanState;
 import dev.mckelle.gui.api.state.Ref;
 import dev.mckelle.gui.api.state.State;
 import org.jetbrains.annotations.NotNull;
@@ -158,6 +160,11 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
          * @return The total number of pages, or -1 if it is not yet known.
          */
         int totalPages();
+
+        /**
+         * Force the data loader to refetch it's contents.
+         */
+        void refresh();
     }
 
     /**
@@ -364,10 +371,11 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         final State<Integer> page = context.useState(0);
         final State<List<T>> items = context.useState(Collections.emptyList());
         final State<Integer> pages = context.useState(-1);
-        final State<Boolean> busy = context.useState(false);
+        final BooleanState refresh = context.useState(false);
 
+        final BooleanRef busy = context.useRef(false);
         final Ref<Integer> lastLoadedPage = context.useRef(() -> -1);
-        
+
         this.handleRef.set(new Handle() {
             @Override
             public void next() {
@@ -393,25 +401,37 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
             public int totalPages() {
                 return pages.get();
             }
+
+            @Override
+            public void refresh() {
+                refresh.set(true);
+            }
         });
         final int capacity = this.slots.size();
 
-        if (!busy.get() && !page.get().equals(lastLoadedPage.get())) {
+        if (refresh.get() || (!busy.get() && !page.isEqual(lastLoadedPage))) {
             busy.set(true);
-            items.set(Collections.emptyList()); // optional: clears stale content
+
+            context.batch(() -> {
+                refresh.set(false);
+                items.set(Collections.emptyList());
+            });
 
             final int target = page.get();
 
-            final BiConsumer<List<T>, Integer> callback = (final List<T> list, final Integer total) ->
+            final BiConsumer<List<T>, Integer> callback = (list, total) ->
                 context.getScheduler().run(() -> {
                     // Drop stale responses.
                     if (page.get() != target) {
                         return;
                     }
-                    items.set(list);
-                    pages.set((int) Math.ceil(total / (double) capacity));
                     lastLoadedPage.set(target);
                     busy.set(false);
+
+                    context.batch(() -> {
+                        items.set(list);
+                        pages.set((int) Math.ceil(total / (double) capacity));
+                    });
                 });
 
             if (this.loaderExecutor != null) {
@@ -426,7 +446,6 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
             final int[] pos = this.slots.get(i);
             final int x = pos[0];
             final int y = pos[1];
-
             final T value = data.get(i);
             final ViewRenderable renderable = this.renderer.render(value, i);
 
