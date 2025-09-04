@@ -160,13 +160,19 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
         final List<?> lastDependencies = record.lastDependencies().get();
 
         if (lastDependencies == null || !Objects.equals(lastDependencies, dependencies)) {
-            if (record.cleanup().isPresent()) {
-                record.cleanup().get().run();
-            }
-            final Runnable newCleanup = effect.get();
+            // Defer running effects until after the current render has completed.
+            // This avoids executing side-effects during render and prevents races
+            // with child components
+            this.scheduler.run(() -> {
+                // Run previous cleanup (if any) before installing the new effect
+                if (record.cleanup().isPresent()) {
+                    record.cleanup().get().run();
+                }
+                final Runnable newCleanup = effect.get();
 
-            record.cleanup().set(newCleanup);
-            record.lastDependencies().set(dependencies);
+                record.cleanup().set(newCleanup);
+                record.lastDependencies().set(dependencies);
+            });
         }
     }
 

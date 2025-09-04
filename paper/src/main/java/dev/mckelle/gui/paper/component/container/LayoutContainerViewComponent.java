@@ -163,6 +163,58 @@ public final class LayoutContainerViewComponent extends dev.mckelle.gui.core.com
         }
 
         /**
+         * Maps a character to a static child component rendered at each occurrence without props.
+         *
+         * @param ch        the layout channel character
+         * @param component the child component to render
+         * @param <K>       props type of the child component
+         * @return this builder
+         */
+        public <K> @NotNull Builder component(final char ch, @NotNull final ViewComponentBase<Player, K, ?> component) {
+            return this.map(ch, (index, x, y, slot) -> slot.component(component));
+        }
+
+        /**
+         * Maps a character to a static child component with props at each occurrence.
+         *
+         * @param ch        the layout channel character
+         * @param component the child component to render
+         * @param props     props to pass to the child component
+         * @param <K>       props type of the child component
+         * @return this builder
+         */
+        public <K> @NotNull Builder component(final char ch, @NotNull final ViewComponentBase<Player, K, ?> component, @Nullable final K props) {
+            return this.map(ch, (index, x, y, slot) -> slot.component(component, props));
+        }
+
+        /**
+         * Maps a character to a built child component at each occurrence without props.
+         *
+         * @param ch      the layout channel character
+         * @param builder builder that produces the child component
+         * @param <K>     props type of the child component
+         * @param <T>     concrete component type
+         * @return this builder
+         */
+        public <K, T extends ViewComponentBase<Player, K, ?>> @NotNull Builder component(final char ch, @NotNull final ViewComponentBase.Builder<?, T> builder) {
+            return this.map(ch, (index, x, y, slot) -> slot.component(builder));
+        }
+
+        /**
+         * Maps a character to a built child component with props at each occurrence.
+         *
+         * @param ch      the layout channel character
+         * @param builder builder that produces the child component
+         * @param props   props to pass to the child component
+         * @param <K>     props type of the child component
+         * @param <T>     concrete component type
+         * @return this builder
+         */
+        public <K, T extends ViewComponentBase<Player, K, ?>> @NotNull Builder component(final char ch, @NotNull final ViewComponentBase.Builder<?, T> builder, @Nullable final K props) {
+            return this.map(ch, (index, x, y, slot) -> slot.component(builder, props));
+        }
+
+        /**
          * Builds the {@link LayoutContainerViewComponent} and applies all mappings.
          *
          * @return a new layout container instance

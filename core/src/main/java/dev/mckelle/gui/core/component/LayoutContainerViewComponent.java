@@ -85,6 +85,46 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
          * @return this builder for method chaining
          */
         @NotNull SlotBuilder<V, C> onClick(@Nullable ClickHandler<V, C> clickHandler);
+
+        /**
+         * Renders a child {@link ViewComponentBase} at this slot without props.
+         *
+         * @param component the child component to render
+         * @param <K>       props type of the child component
+         * @return this builder for method chaining
+         */
+        @NotNull <K> SlotBuilder<V, C> component(@NotNull ViewComponentBase<V, K, ?> component);
+
+        /**
+         * Renders a child {@link ViewComponentBase} at this slot with optional props.
+         *
+         * @param component the child component to render
+         * @param props     optional props to pass to the child component
+         * @param <K>       props type of the child component
+         * @return this builder for method chaining
+         */
+        @NotNull <K> SlotBuilder<V, C> component(@NotNull ViewComponentBase<V, K, ?> component, @Nullable K props);
+
+        /**
+         * Builds and renders a child component at this slot without props.
+         *
+         * @param builder component builder to produce the child
+         * @param <K>     props type of the child component
+         * @param <T>     concrete type of the child component
+         * @return this builder for method chaining
+         */
+        @NotNull <K, T extends ViewComponentBase<V, K, ?>> SlotBuilder<V, C> component(@NotNull ViewComponentBase.Builder<?, T> builder);
+
+        /**
+         * Builds and renders a child component at this slot with props.
+         *
+         * @param builder component builder to produce the child
+         * @param props   optional props to pass to the child component
+         * @param <K>     props type of the child component
+         * @param <T>     concrete type of the child component
+         * @return this builder for method chaining
+         */
+        @NotNull <K, T extends ViewComponentBase<V, K, ?>> SlotBuilder<V, C> component(@NotNull ViewComponentBase.Builder<?, T> builder, @Nullable K props);
     }
 
     /**
@@ -246,6 +286,58 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
     }
 
     /**
+     * Maps a character to a child component rendered at each occurrence without props.
+     *
+     * @param ch        the character to map
+     * @param component the component to render at each occurrence
+     * @param <K>       props type of the child component
+     * @return this container for method chaining
+     */
+    public final <K> S map(final char ch, @NotNull final ViewComponentBase<V, K, ?> component) {
+        return this.map(ch, (index, x, y, builder) -> builder.component(component));
+    }
+
+    /**
+     * Maps a character to a child component rendered at each occurrence with props.
+     *
+     * @param ch        the character to map
+     * @param component the component to render at each occurrence
+     * @param props     props to pass to the child component
+     * @param <K>       props type of the child component
+     * @return this container for method chaining
+     */
+    public final <K> S map(final char ch, @NotNull final ViewComponentBase<V, K, ?> component, @Nullable final K props) {
+        return this.map(ch, (index, x, y, builder) -> builder.component(component, props));
+    }
+
+    /**
+     * Maps a character to a built child component at each occurrence without props.
+     *
+     * @param ch      the character to map
+     * @param builder component builder to produce the child component
+     * @param <K>     props type of the child component
+     * @param <T>     concrete component type
+     * @return this container for method chaining
+     */
+    public final <K, T extends ViewComponentBase<V, K, ?>> S map(final char ch, @NotNull final ViewComponentBase.Builder<?, T> builder) {
+        return this.map(ch, (index, x, y, slot) -> slot.component(builder));
+    }
+
+    /**
+     * Maps a character to a built child component at each occurrence with props.
+     *
+     * @param ch      the character to map
+     * @param builder component builder to produce the child component
+     * @param props   props to pass to the child component
+     * @param <K>     props type of the child component
+     * @param <T>     concrete component type
+     * @return this container for method chaining
+     */
+    public final <K, T extends ViewComponentBase<V, K, ?>> S map(final char ch, @NotNull final ViewComponentBase.Builder<?, T> builder, @Nullable final K props) {
+        return this.map(ch, (index, x, y, slot) -> slot.component(builder, props));
+    }
+
+    /**
      * Renders the layout by iterating through the mask. For each character, it finds the
      * corresponding {@link SlotConfigurer}, calculates the occurrence index, and invokes
      * the configurer to populate the slot in the given render context.
@@ -289,6 +381,8 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
 
         private ViewRenderable renderable;
         private ClickHandler<V, C> click;
+        private ViewComponentBase<V, Object, ?> component;
+        private Object componentProps;
 
         /**
          * Creates a new builder for the specified position within the render context.
@@ -325,19 +419,54 @@ public class LayoutContainerViewComponent<V, CC extends IClickContext<V>, RC ext
             return this;
         }
 
+        @Override
+        @SuppressWarnings("unchecked")
+        public @NotNull <K> SlotBuilder<V, C> component(@NotNull final ViewComponentBase<V, K, ?> component) {
+            this.component = (ViewComponentBase<V, Object, ?>) component;
+            this.componentProps = null;
+            this.flush();
+
+            return this;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public @NotNull <K> SlotBuilder<V, C> component(@NotNull final ViewComponentBase<V, K, ?> component, @Nullable final K props) {
+            this.component = (ViewComponentBase<V, Object, ?>) component;
+            this.componentProps = props;
+
+            this.flush();
+
+            return this;
+        }
+
+        @Override
+        public @NotNull <K, T extends ViewComponentBase<V, K, ?>> SlotBuilder<V, C> component(@NotNull final ViewComponentBase.Builder<?, T> builder) {
+            return this.component(builder.build());
+        }
+
+        @Override
+        public @NotNull <K, T extends ViewComponentBase<V, K, ?>> SlotBuilder<V, C> component(@NotNull final ViewComponentBase.Builder<?, T> builder, @Nullable final K props) {
+            return this.component(builder.build(), props);
+        }
+
         /**
          * Applies the current item and click handler configuration to the render context.
          * This method is called internally whenever the item or click handler is set,
          * immediately updating the corresponding slot.
          */
         private void flush() {
-            if (this.renderable == null) {
+            if (this.component != null) {
+                this.context.set(this.x, this.y, (ViewComponentBase<V, Object, ?>) this.component, this.componentProps);
+
                 return;
             }
-            if (this.click == null) {
-                this.context.set(this.x, this.y, this.renderable);
-            } else {
-                this.context.set(this.x, this.y, this.renderable, this.click);
+            if (this.renderable != null) {
+                if (this.click == null) {
+                    this.context.set(this.x, this.y, this.renderable);
+                } else {
+                    this.context.set(this.x, this.y, this.renderable, this.click);
+                }
             }
         }
     }

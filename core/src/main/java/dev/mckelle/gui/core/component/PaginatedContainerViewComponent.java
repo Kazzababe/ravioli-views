@@ -7,6 +7,8 @@ import dev.mckelle.gui.api.interaction.ClickHandler;
 import dev.mckelle.gui.api.render.ViewRenderable;
 import dev.mckelle.gui.api.state.BooleanRef;
 import dev.mckelle.gui.api.state.BooleanState;
+import dev.mckelle.gui.api.state.IntegerRef;
+import dev.mckelle.gui.api.state.IntegerState;
 import dev.mckelle.gui.api.state.Ref;
 import dev.mckelle.gui.api.state.State;
 import org.jetbrains.annotations.NotNull;
@@ -15,7 +17,10 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
@@ -33,6 +38,76 @@ import java.util.function.BiConsumer;
  * @param <RC> The render context type.
  */
 public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, RC extends IRenderContext<V, Void, CC>> extends ViewComponentBase<V, Void, RC> {
+    /**
+     * Functional interface for configuring a slot at a mask occurrence to render a child component.
+     * The configurer receives the occurrence index for the given character, the coordinates (x,y),
+     * and a builder for rendering a child component.
+     *
+     * @param <V> viewer type
+     * @param <C> click context type
+     */
+    @FunctionalInterface
+    public interface SlotConfigurer<V, C extends IClickContext<V>> {
+        /**
+         * Configures a slot occurrence for a mapped character.
+         *
+         * @param index   0-based occurrence index for the character in the mask
+         * @param x       x-coordinate within the mask (column)
+         * @param y       y-coordinate within the mask (row)
+         * @param builder builder used to render a child component into this slot
+         */
+        void configure(int index, int x, int y, @NotNull SlotBuilder<V, C> builder);
+    }
+
+    /**
+     * Builder for rendering child components into a slot. Unlike the layout container, this builder
+     * is intentionally limited to component rendering so it cannot conflict with item cell rendering.
+     *
+     * @param <V> viewer type
+     * @param <C> click context type
+     */
+    public interface SlotBuilder<V, C extends IClickContext<V>> {
+        /**
+         * Renders a child component at this slot without props.
+         *
+         * @param component child component to render
+         * @param <K>       props type of the child component
+         * @return this builder
+         */
+        @NotNull <K> SlotBuilder<V, C> component(@NotNull ViewComponentBase<V, K, ?> component);
+
+        /**
+         * Renders a child component at this slot with props.
+         *
+         * @param component child component to render
+         * @param props     optional props to pass to the child component
+         * @param <K>       props type of the child component
+         * @return this builder
+         */
+        @NotNull <K> SlotBuilder<V, C> component(@NotNull ViewComponentBase<V, K, ?> component, @Nullable K props);
+
+        /**
+         * Builds and renders a child component at this slot without props.
+         *
+         * @param builder builder that produces the child component
+         * @param <K>     props type of the child component
+         * @param <X>     concrete component type
+         * @return this builder
+         */
+        @NotNull <K, X extends ViewComponentBase<V, K, ?>> SlotBuilder<V, C> component(@NotNull ViewComponentBase.Builder<?, X> builder);
+
+        /**
+         * Builds and renders a child component at this slot with props.
+         *
+         * @param builder builder that produces the child component
+         * @param props   optional props to pass to the child component
+         * @param <K>     props type of the child component
+         * @param <X>     concrete component type
+         * @return this builder
+         */
+        @NotNull <K, X extends ViewComponentBase<V, K, ?>> SlotBuilder<V, C> component(@NotNull ViewComponentBase.Builder<?, X> builder, @Nullable K props);
+    }
+
 
     /**
      * Loader interface for supplying items for a specific page and page size.
@@ -191,12 +266,13 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      * A slot is any position in the mask that is not a space character.
      * Order is row-major by mask traversal.
      */
-    private final List<int[]> slots;
+    private List<int[]> slots;
     private final DataLoader<T> loader;
     private final CellRenderer<V, T> renderer;
     private final CellClick<V, T, CC> clickMapper;
     private final Ref<Handle> handleRef;
     private final Executor loaderExecutor;
+    private final Map<Character, List<SlotConfigurer<V, CC>>> componentConfigurers = new HashMap<>();
 
     /**
      * Creates a new paginated container from a character mask. Any non-space character
@@ -234,7 +310,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
             }
         }
         this.mask = mask.clone();
-        this.slots = computeSlots(this.mask);
+        this.recomputeSlots();
         this.loader = loader;
         this.renderer = renderer;
         this.clickMapper = clickMapper;
@@ -324,22 +400,23 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
     }
 
     /**
-     * Computes the list of slot coordinates for a given mask.
-     * Any non-space character is considered a valid slot.
+     * Recomputes the list of item slots excluding any positions reserved by component mappings.
      */
-    private static List<int[]> computeSlots(@NotNull final String[] mask) {
+    private void recomputeSlots() {
+        final HashSet<Character> reserved = new HashSet<>(this.componentConfigurers.keySet());
         final List<int[]> list = new ArrayList<>();
 
-        for (int y = 0; y < mask.length; y++) {
-            final String row = mask[y];
+        for (int y = 0; y < this.mask.length; y++) {
+            final String row = this.mask[y];
 
             for (int x = 0; x < row.length(); x++) {
-                if (row.charAt(x) != ' ') {
+                final char ch = row.charAt(x);
+                if (ch != ' ' && !reserved.contains(ch)) {
                     list.add(new int[] {x, y});
                 }
             }
         }
-        return Collections.unmodifiableList(list);
+        this.slots = Collections.unmodifiableList(list);
     }
 
     /**
@@ -368,13 +445,36 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      */
     @Override
     public void render(@NotNull final RC context) {
-        final State<Integer> page = context.useState(0);
+        // First, render any mapped components per character from the mask.
+        if (!this.componentConfigurers.isEmpty()) {
+            final Map<Character, Integer> counters = new HashMap<>();
+
+            for (int y = 0; y < this.mask.length; y++) {
+                final String row = this.mask[y];
+
+                for (int x = 0; x < row.length(); x++) {
+                    final char character = row.charAt(x);
+                    final List<SlotConfigurer<V, CC>> list = this.componentConfigurers.get(character);
+
+                    if (list == null) {
+                        continue;
+                    }
+                    final int index = counters.getOrDefault(character, 0);
+
+                    for (final SlotConfigurer<V, CC> configurer : list) {
+                        configurer.configure(index, x, y, new SlotBuilderImpl<>(context, x, y));
+                    }
+                    counters.put(character, index + 1);
+                }
+            }
+        }
+        final IntegerState page = context.useState(0);
         final State<List<T>> items = context.useState(Collections.emptyList());
-        final State<Integer> pages = context.useState(-1);
+        final IntegerState pages = context.useState(-1);
         final BooleanState refresh = context.useState(false);
 
         final BooleanRef busy = context.useRef(false);
-        final Ref<Integer> lastLoadedPage = context.useRef(() -> -1);
+        final IntegerRef lastLoadedPage = context.useRef(-1);
 
         this.handleRef.set(new Handle() {
             @Override
@@ -460,6 +560,121 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
             } else {
                 context.set(x, y, renderable);
             }
+        }
+    }
+
+    /**
+     * Maps a character to a component configurer that will render a child component at each occurrence.
+     * Adding a mapping reserves that character from being used for item slots.
+     *
+     * @param ch         the character to map
+     * @param configurer component slot configurer
+     * @return this container for chaining
+     */
+    public final PaginatedContainerViewComponent<V, T, CC, RC> map(final char ch, @NotNull final SlotConfigurer<V, CC> configurer) {
+        this.componentConfigurers.computeIfAbsent(ch, k -> new ArrayList<>()).add(configurer);
+        this.recomputeSlots();
+
+        return this;
+    }
+
+    /**
+     * Maps a character to a static child component at each occurrence without props.
+     *
+     * @param ch        the character to map from the mask
+     * @param component component to render at each occurrence
+     * @param <K>       props type of the child component
+     * @return this container for chaining
+     */
+    public final <K> PaginatedContainerViewComponent<V, T, CC, RC> map(final char ch, @NotNull final ViewComponentBase<V, K, ?> component) {
+        return this.map(ch, (index, x, y, slot) -> slot.component(component));
+    }
+
+    /**
+     * Maps a character to a static child component at each occurrence with props.
+     *
+     * @param ch        the character to map from the mask
+     * @param component component to render at each occurrence
+     * @param props     props to pass into the component
+     * @param <K>       props type of the child component
+     * @return this container for chaining
+     */
+    public final <K> PaginatedContainerViewComponent<V, T, CC, RC> map(final char ch, @NotNull final ViewComponentBase<V, K, ?> component, @Nullable final K props) {
+        return this.map(ch, (index, x, y, slot) -> slot.component(component, props));
+    }
+
+    /**
+     * Maps a character to a built child component at each occurrence without props.
+     *
+     * @param ch      the character to map from the mask
+     * @param builder builder that produces the child component
+     * @param <K>     props type of the child component
+     * @param <X>     concrete component type
+     * @return this container for chaining
+     */
+    public final <K, X extends ViewComponentBase<V, K, ?>> PaginatedContainerViewComponent<V, T, CC, RC> map(final char ch, @NotNull final ViewComponentBase.Builder<?, X> builder) {
+        return this.map(ch, (index, x, y, slot) -> slot.component(builder));
+    }
+
+    /**
+     * Maps a character to a built child component at each occurrence with props.
+     *
+     * @param ch      the character to map from the mask
+     * @param builder builder that produces the child component
+     * @param props   props to pass into the component
+     * @param <K>     props type of the child component
+     * @param <X>     concrete component type
+     * @return this container for chaining
+     */
+    public final <K, X extends ViewComponentBase<V, K, ?>> PaginatedContainerViewComponent<V, T, CC, RC> map(final char ch, @NotNull final ViewComponentBase.Builder<?, X> builder, @Nullable final K props) {
+        return this.map(ch, (index, x, y, slot) -> slot.component(builder, props));
+    }
+
+    /**
+     * SlotBuilder implementation that writes child components into the render context.
+     */
+    private static final class SlotBuilderImpl<V, C extends IClickContext<V>> implements SlotBuilder<V, C> {
+        private final IRenderContext<V, Void, C> context;
+        private final int x;
+        private final int y;
+
+        /**
+         * Creates a builder bound to a specific (x,y) slot in the provided context.
+         *
+         * @param context render context to write into
+         * @param x       x-coordinate (column)
+         * @param y       y-coordinate (row)
+         */
+        private SlotBuilderImpl(@NotNull final IRenderContext<V, Void, C> context, final int x, final int y) {
+            this.context = context;
+            this.x = x;
+            this.y = y;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public @NotNull <K> SlotBuilder<V, C> component(@NotNull final ViewComponentBase<V, K, ?> component) {
+            this.context.set(this.x, this.y, (ViewComponentBase<V, Object, ?>) component, null);
+
+            return this;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public @NotNull <K> SlotBuilder<V, C> component(@NotNull final ViewComponentBase<V, K, ?> component, @Nullable final K props) {
+            this.context.set(this.x, this.y, (ViewComponentBase<V, Object, ?>) component, props);
+
+            return this;
+        }
+
+        @Override
+        public @NotNull <K, X extends ViewComponentBase<V, K, ?>> SlotBuilder<V, C> component(@NotNull final ViewComponentBase.Builder<?, X> builder) {
+            return this.component(builder.build());
+        }
+
+        @Override
+        public @NotNull <K, X extends ViewComponentBase<V, K, ?>> SlotBuilder<V, C> component(@NotNull final ViewComponentBase.Builder<?, X> builder, @Nullable final K props) {
+            return this.component(builder.build(), props);
         }
     }
 

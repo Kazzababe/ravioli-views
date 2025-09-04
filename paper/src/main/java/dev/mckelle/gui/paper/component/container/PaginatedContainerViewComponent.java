@@ -9,7 +9,9 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
@@ -140,6 +142,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
         private Integer height;
         private Executor loaderExecutor;
         private String key;
+        private final Map<Character, List<SlotConfigurer<Player, ClickContext>>> componentMappings = new HashMap<>();
 
         /**
          * Creates a new builder.
@@ -351,10 +354,28 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
                 throw new IllegalStateException("handleRef is required");
             }
             if (this.mask != null) {
-                return new PaginatedContainerViewComponent<>(this.key, this.loader, this.renderer, this.clickMapper, this.handleRef, this.loaderExecutor, this.mask);
+                final PaginatedContainerViewComponent<T> component = new PaginatedContainerViewComponent<>(this.key, this.loader, this.renderer, this.clickMapper, this.handleRef, this.loaderExecutor, this.mask);
+
+                for (final var entry : this.componentMappings.entrySet()) {
+                    final char ch = entry.getKey();
+
+                    for (final SlotConfigurer<Player, ClickContext> config : entry.getValue()) {
+                        component.map(ch, config);
+                    }
+                }
+                return component;
             }
             if (this.width != null && this.height != null) {
-                return new PaginatedContainerViewComponent<>(this.key, this.width, this.height, this.loader, this.renderer, this.clickMapper, this.handleRef, this.loaderExecutor);
+                final PaginatedContainerViewComponent<T> component = new PaginatedContainerViewComponent<>(this.key, this.width, this.height, this.loader, this.renderer, this.clickMapper, this.handleRef, this.loaderExecutor);
+
+                for (final var entry : this.componentMappings.entrySet()) {
+                    final char ch = entry.getKey();
+
+                    for (final SlotConfigurer<Player, ClickContext> config : entry.getValue()) {
+                        component.map(ch, config);
+                    }
+                }
+                return component;
             }
             throw new IllegalStateException("either mask(...) or size(width,height) must be provided");
         }
@@ -366,6 +387,66 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
         public @NotNull Builder<T> key(@Nullable final String key) {
             this.key = key;
 
+            return this;
+        }
+
+        /**
+         * Maps a character to a static child component at each occurrence without props.
+         */
+        /**
+         * Maps a character to a static child component at each occurrence without props.
+         *
+         * @param ch        the layout channel character
+         * @param component the child component to render
+         * @param <K>       props type of the child component
+         * @return this builder
+         */
+        public <K> @NotNull Builder<T> component(final char ch, @NotNull final ViewComponentBase<Player, K, ?> component) {
+            return this.map(ch, (index, x, y, slot) -> slot.component(component));
+        }
+
+        /**
+         * Maps a character to a static child component at each occurrence with props.
+         *
+         * @param ch        the layout channel character
+         * @param component the child component to render
+         * @param props     props to pass to the child component
+         * @param <K>       props type of the child component
+         * @return this builder
+         */
+        public <K> @NotNull Builder<T> component(final char ch, @NotNull final ViewComponentBase<Player, K, ?> component, @Nullable final K props) {
+            return this.map(ch, (index, x, y, slot) -> slot.component(component, props));
+        }
+
+        /**
+         * Maps a character to a built child component at each occurrence without props.
+         *
+         * @param ch      the layout channel character
+         * @param builder builder that produces the child component
+         * @param <K>     props type of the child component
+         * @param <X>     concrete component type
+         * @return this builder
+         */
+        public <K, X extends ViewComponentBase<Player, K, ?>> @NotNull Builder<T> component(final char ch, @NotNull final ViewComponentBase.Builder<?, X> builder) {
+            return this.map(ch, (index, x, y, slot) -> slot.component(builder));
+        }
+
+        /**
+         * Maps a character to a built child component at each occurrence with props.
+         *
+         * @param ch      the layout channel character
+         * @param builder builder that produces the child component
+         * @param props   props to pass to the child component
+         * @param <K>     props type of the child component
+         * @param <X>     concrete component type
+         * @return this builder
+         */
+        public <K, X extends ViewComponentBase<Player, K, ?>> @NotNull Builder<T> component(final char ch, @NotNull final ViewComponentBase.Builder<?, X> builder, @Nullable final K props) {
+            return this.map(ch, (index, x, y, slot) -> slot.component(builder, props));
+        }
+
+        private @NotNull Builder<T> map(final char ch, @NotNull final SlotConfigurer<Player, ClickContext> configurer) {
+            this.componentMappings.computeIfAbsent(ch, k -> new java.util.ArrayList<>()).add(configurer);
             return this;
         }
     }
