@@ -355,6 +355,8 @@ public final class ViewManager {
                         }
                     }
                     clickedInventory.setItem(event.getSlot(), itemToMove.getAmount() > 0 ? itemToMove : null);
+                } else {
+                    event.setCancelled(true);
                 }
                 return;
             }
