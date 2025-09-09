@@ -278,7 +278,9 @@ public final class ViewManager {
             final Inventory topInventory = playerSession.session.inventory();
             final Inventory clickedInventory = event.getClickedInventory();
 
-            if (event.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY && clickedInventory != null && clickedInventory != topInventory) {
+            if (event.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY
+                && clickedInventory != null
+                && clickedInventory != topInventory) {
                 final ItemStack originalItem = event.getCurrentItem();
 
                 if (originalItem == null || originalItem.isEmpty()) {
@@ -294,22 +296,25 @@ public final class ViewManager {
                         break;
                     }
                 }
-                if (containerProps != null) {
-                    event.setCancelled(true);
+                event.setCancelled(true);
 
+                if (containerProps != null) {
                     if (!containerProps.filter().test(itemToMove)) {
-                        return;
+                        return; // rejected by container-wide filter
                     }
                     final Consumer<VirtualContainerViewComponent.ChangeEvent> onChange = containerProps.onChange();
 
-                    for (int i = 0; i < topInventory.getSize(); i++) {
+                    // Merge into existing stacks first
+                    for (int slotIndex = 0; slotIndex < topInventory.getSize(); slotIndex++) {
                         if (itemToMove.getAmount() <= 0) {
                             break;
                         }
-                        if (!(playerSession.session.renderer().renderables().get(i) instanceof VirtualContainerViewComponent.EditableSlot)) {
+                        final var possibleSlot = playerSession.session.renderer().renderables().get(slotIndex);
+
+                        if (!(possibleSlot instanceof VirtualContainerViewComponent.EditableSlot)) {
                             continue;
                         }
-                        final ItemStack existingItem = topInventory.getItem(i);
+                        final ItemStack existingItem = topInventory.getItem(slotIndex);
 
                         if (existingItem == null || existingItem.isEmpty() || !existingItem.isSimilar(itemToMove)) {
                             continue;
@@ -326,37 +331,42 @@ public final class ViewManager {
                         itemToMove.setAmount(itemToMove.getAmount() - amountToTransfer);
 
                         if (onChange != null) {
-                            onChange.accept(new VirtualContainerViewComponent.ChangeEvent(player, i, oldItemState, existingItem.clone()));
+                            onChange.accept(new VirtualContainerViewComponent.ChangeEvent(
+                                player, slotIndex, oldItemState, existingItem.clone()
+                            ));
                         }
                     }
+                    // Fill empty editable slots next
                     if (itemToMove.getAmount() > 0) {
-                        for (int i = 0; i < topInventory.getSize(); i++) {
+                        for (int slotIndex = 0; slotIndex < topInventory.getSize(); slotIndex++) {
                             if (itemToMove.getAmount() <= 0) {
                                 break;
                             }
-                            if (!(playerSession.session.renderer().renderables().get(i) instanceof VirtualContainerViewComponent.EditableSlot)) {
+                            final var possibleSlot = playerSession.session.renderer().renderables().get(slotIndex);
+
+                            if (!(possibleSlot instanceof VirtualContainerViewComponent.EditableSlot)) {
                                 continue;
                             }
-                            final ItemStack topItem = topInventory.getItem(i);
+                            final ItemStack currentTopItem = topInventory.getItem(slotIndex);
 
-                            if (topItem != null && !topItem.isEmpty()) {
+                            if (currentTopItem != null && !currentTopItem.isEmpty()) {
                                 continue;
                             }
                             final int amountToTransfer = Math.min(itemToMove.getMaxStackSize(), itemToMove.getAmount());
                             final ItemStack newItem = itemToMove.clone();
 
                             newItem.setAmount(amountToTransfer);
-                            topInventory.setItem(i, newItem);
+                            topInventory.setItem(slotIndex, newItem);
                             itemToMove.setAmount(itemToMove.getAmount() - amountToTransfer);
 
                             if (onChange != null) {
-                                onChange.accept(new VirtualContainerViewComponent.ChangeEvent(player, i, null, newItem.clone()));
+                                onChange.accept(new VirtualContainerViewComponent.ChangeEvent(
+                                    player, slotIndex, null, newItem.clone()
+                                ));
                             }
                         }
                     }
                     clickedInventory.setItem(event.getSlot(), itemToMove.getAmount() > 0 ? itemToMove : null);
-                } else {
-                    event.setCancelled(true);
                 }
                 return;
             }
@@ -368,74 +378,115 @@ public final class ViewManager {
                 }
                 final Map<Integer, ItemStack> afterState = InventoryUtils.predictTopInventoryChanges(event);
 
-                for (final Map.Entry<Integer, ItemStack> afterEntry : afterState.entrySet()) {
-                    final int slot = afterEntry.getKey();
+                for (final Map.Entry<Integer, ItemStack> entry : afterState.entrySet()) {
+                    final int slotIndex = entry.getKey();
+                    final ItemStack newStack = entry.getValue();
 
-                    if (Objects.equals(beforeState.get(slot), afterEntry.getValue())) {
+                    if (Objects.equals(beforeState.get(slotIndex), newStack)) {
                         continue;
                     }
-                    final ViewRenderable renderable = playerSession.session.renderer().renderables().get(slot);
+                    final ViewRenderable renderable = playerSession.session.renderer().renderables().get(slotIndex);
 
-                    if (!(renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot) || editableSlot.onChange() == null) {
+                    if (!(renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot)) {
+                        event.setCancelled(true);
+
+                        return;
+                    }
+                    if (newStack != null && !newStack.isEmpty() && !editableSlot.filter().test(newStack)) {
+                        event.setCancelled(true);
+
+                        return;
+                    }
+                }
+                for (final Map.Entry<Integer, ItemStack> entry : afterState.entrySet()) {
+                    final int slotIndex = entry.getKey();
+
+                    if (Objects.equals(beforeState.get(slotIndex), entry.getValue())) {
                         continue;
                     }
-                    editableSlot.onChange().accept(
-                        new VirtualContainerViewComponent.ChangeEvent(
-                            player,
-                            slot,
-                            beforeState.get(slot),
-                            afterEntry.getValue()
-                        )
-                    );
+                    final ViewRenderable renderable = playerSession.session.renderer().renderables().get(slotIndex);
+
+                    if (renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot
+                        && editableSlot.onChange() != null) {
+                        editableSlot.onChange().accept(new VirtualContainerViewComponent.ChangeEvent(
+                            player, slotIndex, beforeState.get(slotIndex), entry.getValue()
+                        ));
+                    }
                 }
                 return;
             }
+            // Clicked in top inventory
             final ViewRenderable renderable = playerSession.session.renderer().renderables().get(event.getRawSlot());
 
             if (renderable instanceof VirtualContainerViewComponent.EditableSlot(
                 final Predicate<ItemStack> filter,
                 final Consumer<VirtualContainerViewComponent.ChangeEvent> onChange
             )) {
-                final ItemStack itemToPlace;
+                // Determine the incoming stack for all relevant "place into top" actions
+                final ItemStack candidateToPlace;
 
                 switch (event.getAction()) {
-                    case PLACE_ALL, PLACE_SOME, PLACE_ONE -> itemToPlace = event.getCursor();
-                    case MOVE_TO_OTHER_INVENTORY -> itemToPlace = event.getCurrentItem();
-                    default -> itemToPlace = null;
-                }
-                if (itemToPlace == null || itemToPlace.isEmpty() || filter.test(itemToPlace)) {
-                    final Map<Integer, ItemStack> beforeState = new HashMap<>();
+                    case PLACE_ALL:
+                    case PLACE_SOME:
+                    case PLACE_ONE, SWAP_WITH_CURSOR: {
+                        candidateToPlace = event.getCursor();
 
-                    for (int i = 0; i < topInventory.getSize(); i++) {
-                        beforeState.put(i, InventoryUtils.cloneOrNull(topInventory.getItem(i)));
+                        break;
                     }
-                    final Map<Integer, ItemStack> afterState = InventoryUtils.predictTopInventoryChanges(event);
+                    case HOTBAR_SWAP: {
+                        final int hotbarButton = event.getHotbarButton();
 
-                    for (final Map.Entry<Integer, ItemStack> afterEntry : afterState.entrySet()) {
-                        final int slot = afterEntry.getKey();
+                        candidateToPlace = (hotbarButton >= 0)
+                            ? player.getInventory().getItem(hotbarButton)
+                            : null;
 
-                        if (Objects.equals(beforeState.get(slot), afterEntry.getValue())) {
-                            continue;
-                        }
-                        if (onChange == null) {
-                            continue;
-                        }
-                        onChange.accept(new VirtualContainerViewComponent.ChangeEvent(
-                            player,
-                            slot,
-                            beforeState.get(slot),
-                            afterEntry.getValue()
-                        ));
+                        break;
+                    }
+                    default: {
+                        candidateToPlace = null;
+
+                        break;
                     }
                 }
-            } else {
-                final ClickHandler<Player, ClickContext> clickHandler = playerSession.session.renderer().clicks().get(event.getRawSlot());
+                final boolean hasCandidate = candidateToPlace != null && !candidateToPlace.getType().isAir();
 
-                event.setCancelled(true);
+                if (hasCandidate && !filter.test(candidateToPlace)) {
+                    event.setCancelled(true);
 
-                if (clickHandler != null) {
-                    clickHandler.accept(new ClickContext(player, event));
+                    return;
                 }
+                if (onChange == null) {
+                    return;
+                }
+                final Map<Integer, ItemStack> beforeState = new HashMap<>();
+
+                for (int i = 0; i < topInventory.getSize(); i++) {
+                    beforeState.put(i, InventoryUtils.cloneOrNull(topInventory.getItem(i)));
+                }
+                final Map<Integer, ItemStack> afterState = InventoryUtils.predictTopInventoryChanges(event);
+
+                for (final Map.Entry<Integer, ItemStack> entry : afterState.entrySet()) {
+                    final int slotIndex = entry.getKey();
+
+                    if (Objects.equals(beforeState.get(slotIndex), entry.getValue())) {
+                        continue;
+                    }
+                    onChange.accept(new VirtualContainerViewComponent.ChangeEvent(
+                        player, slotIndex, beforeState.get(slotIndex), entry.getValue()
+                    ));
+                }
+                return;
+            }
+            // Non-editable slot inside the view — block vanilla behavior and route to click handler if any
+            final ClickHandler<Player, ClickContext> clickHandler = playerSession.session
+                .renderer()
+                .clicks()
+                .get(event.getRawSlot());
+
+            event.setCancelled(true);
+
+            if (clickHandler != null) {
+                clickHandler.accept(new ClickContext(player, event));
             }
         }
 
