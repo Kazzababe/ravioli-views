@@ -47,7 +47,7 @@ import java.util.function.Supplier;
  * @param <D> the data/props type
  * @param <C> the click context type
  */
-public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRenderContext<V, D, C> {
+public abstract class RootRenderContext<V, D, C extends IClickContext<V>> implements IRenderContext<V, D, C> {
     private final int width;
     private final int height;
     private final Map<String, List<State<?>>> stateMap;
@@ -723,6 +723,11 @@ public class RootRenderContext<V, D, C extends IClickContext<V>> implements IRen
         @Override
         public @NotNull Scheduler getScheduler() {
             return RootRenderContext.this.getScheduler();
+        }
+
+        @Override
+        public void updateTitle(@NotNull final String title) {
+            RootRenderContext.this.updateTitle(title);
         }
 
         /**

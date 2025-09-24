@@ -8,13 +8,17 @@ import dev.mckelle.gui.api.state.State;
 import dev.mckelle.gui.api.state.effect.Effect;
 import dev.mckelle.gui.core.RootRenderContext;
 import dev.mckelle.gui.paper.ViewSession;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryView;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -106,6 +110,33 @@ public class PaperRenderContext<D> extends RootRenderContext<Player, D, ClickCon
     }
 
     /**
+     * {@inheritDoc}
+     */
+    @SuppressWarnings("deprecation")
+    @Override
+    public void updateTitle(@NotNull final String title) {
+        final InventoryView inventoryView = this.getViewer().getOpenInventory();
+
+        if (!Objects.equals(inventoryView.getTopInventory(), this.inventory)) {
+            return;
+        }
+        inventoryView.setTitle(title);
+    }
+
+    /**
+     * Updates the title of the inventory with the given component.
+     * This method serializes the provided {@link Component} into a legacy string format
+     * and then updates the inventory title.
+     *
+     * @param title the new title as a {@link Component}; must not be null
+     */
+    public void updateTitle(@NotNull final Component title) {
+        this.updateTitle(
+            LegacyComponentSerializer.legacySection().serialize(title)
+        );
+    }
+
+    /**
      * A Paper-specific child render context for nested components.
      *
      * @param <K> The type of the properties (props) for the nested component.
@@ -142,6 +173,11 @@ public class PaperRenderContext<D> extends RootRenderContext<Player, D, ClickCon
         @Override
         public @NotNull Inventory getInventory() {
             return this.inventory;
+        }
+
+        @Override
+        public void updateTitle(@NotNull final String title) {
+
         }
     }
 }

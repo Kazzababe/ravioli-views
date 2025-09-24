@@ -15,9 +15,11 @@ import dev.mckelle.gui.api.state.Ref;
 import dev.mckelle.gui.api.state.State;
 import dev.mckelle.gui.api.state.StateSupplier;
 import dev.mckelle.gui.api.state.effect.Effect;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.awt.*;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -81,6 +83,14 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
      * @return A platform-agnostic scheduler
      */
     @NotNull Scheduler getScheduler();
+
+    /**
+     * Updates the title of the open view.
+     *
+     * @param title the new title to be set; must not be null
+     */
+    @ApiStatus.Experimental
+    void updateTitle(@NotNull String title);
 
     /**
      * Returns the initial properties passed into this view, if any.
