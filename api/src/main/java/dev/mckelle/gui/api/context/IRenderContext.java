@@ -19,7 +19,6 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.awt.*;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -250,14 +249,34 @@ public interface IRenderContext<V, D, C extends IClickContext<V>> {
 
     /**
      * Creates a piece of synchronous state with the given initial value.
-     * Subsequent calls to State.set(...) will trigger a new render automatically.
+     * Subsequent calls to {@code State#set(Object)} will trigger a new render automatically.
+     * <p>
+     * The {@code initialValue} may be {@code null}. If {@code null} is provided, the state will
+     * begin empty and may be populated later without any special handling.
+     * </p>
      *
-     * @param initialValue initial state value; must not be null
+     * @param initialValue initial state value; may be {@code null}
      * @param <T>          type of the state value
      * @return a State instance containing the initial value
      */
     @NotNull
-    <T> State<T> useState(@NotNull T initialValue);
+    <T> State<T> useState(@Nullable T initialValue);
+
+    /**
+     * Creates a piece of synchronous state with a {@code null} initial value.
+     * <p>
+     * This is equivalent to calling {@link #useState(Object)} with {@code null} and is useful
+     * for cases where the initial value is not yet known. The returned state will not trigger
+     * a render until it is first updated to a different value via {@code State#set(Object)}.
+     * </p>
+     *
+     * @param <T> type of the state value
+     * @return a State instance whose initial value is {@code null}
+     */
+    @NotNull
+    default <T> State<T> useState() {
+        return this.useState((T) null);
+    }
 
     /**
      * Creates a piece of synchronous state for a primitive {@code int}.

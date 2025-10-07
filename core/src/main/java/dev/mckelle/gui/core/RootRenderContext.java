@@ -819,7 +819,7 @@ public abstract class RootRenderContext<V, D, C extends IClickContext<V>> implem
          * {@inheritDoc}
          */
         @Override
-        public @NotNull <T> State<T> useState(@NotNull final T defaultValue) {
+        public @NotNull <T> State<T> useState(@Nullable final T defaultValue) {
             return RootRenderContext.this.useState(defaultValue);
         }
 

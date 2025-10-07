@@ -4,6 +4,7 @@ import dev.mckelle.gui.api.context.IRenderContext;
 import dev.mckelle.gui.api.interaction.ClickHandler;
 import dev.mckelle.gui.api.render.ViewRenderable;
 import dev.mckelle.gui.api.schedule.Scheduler;
+import dev.mckelle.gui.api.session.IViewSession;
 import dev.mckelle.gui.api.state.Ref;
 import dev.mckelle.gui.api.state.State;
 import dev.mckelle.gui.api.state.effect.Effect;
@@ -17,6 +18,8 @@ import dev.mckelle.gui.paper.context.PaperRenderContext;
 import dev.mckelle.gui.paper.schedule.PaperScheduler;
 import dev.mckelle.gui.paper.util.InventoryUtils;
 import dev.mckelle.gui.paper.view.View;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -31,6 +34,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -57,14 +61,28 @@ public final class ViewManager {
     private final Scheduler scheduler;
 
     private final Map<UUID, PlayerViewSession<?>> sessions = new HashMap<>();
+    private final boolean reuseInventoryWhenPossible;
 
     /**
-     * Creates a new ViewManager for the specified plugin.
+     * Initializes a new instance of the ViewManager.
      *
-     * @param plugin The plugin instance that owns this ViewManager.
+     * @param plugin The plugin instance that owns this ViewManager. Cannot be null.
      */
     public ViewManager(@NotNull final Plugin plugin) {
+        this(plugin, false);
+    }
+
+    /**
+     * Creates a new ViewManager instance responsible for managing views
+     * within the plugin and optionally reusing inventories when possible.
+     *
+     * @param plugin                     The plugin instance that owns this ViewManager. Cannot be null.
+     * @param reuseInventoryWhenPossible If true, attempts to reuse inventories across views to optimize performance and reduce memory usage.
+     */
+    @ApiStatus.Experimental
+    public ViewManager(@NotNull final Plugin plugin, final boolean reuseInventoryWhenPossible) {
         this.plugin = plugin;
+        this.reuseInventoryWhenPossible = reuseInventoryWhenPossible;
         this.viewRegistry = new ViewRegistry();
         this.scheduler = new PaperScheduler(plugin);
     }
@@ -156,12 +174,11 @@ public final class ViewManager {
 
         view.init(init);
 
-        final InventoryType inventoryType = init.getType();
-        final PaperInventoryRenderer<D> renderer = new PaperInventoryRenderer<>(inventoryType);
+        final InventoryType requestedType = init.getType();
         final int width;
         final int height;
 
-        switch (inventoryType) {
+        switch (requestedType) {
             case HOPPER -> {
                 width = 5;
                 height = 1;
@@ -174,9 +191,118 @@ public final class ViewManager {
                 width = 9;
                 height = Math.clamp(init.getSize(), 1, 6);
             }
-            default -> throw new IllegalArgumentException("Unsupported inventory type " + inventoryType);
+            default -> throw new IllegalArgumentException("Unsupported inventory type " + requestedType);
         }
         final int slots = width * height;
+        // Attempt to reuse the existing inventory if compatible (same type and size)
+        final PlayerViewSession<?> existing = this.sessions.get(player.getUniqueId());
+
+        if (existing != null && this.reuseInventoryWhenPossible) {
+            final Inventory currentInventory = existing.session.inventory();
+            final InventoryType currentType = currentInventory.getType();
+            boolean canReuse = currentType == requestedType;
+
+            if (canReuse && currentType == InventoryType.CHEST) {
+                canReuse = currentInventory.getSize() == slots; // Same number of slots (9 * rows)
+            }
+            if (canReuse) {
+                @SuppressWarnings("unchecked")
+                final ViewSession<D> existingSession = (ViewSession<D>) existing.session;
+                final PaperInventoryRenderer<D> renderer = existingSession.renderer();
+
+                existingSession.getRoot().close(new CloseContext<>(
+                    player,
+                    existingSession.getProps(),
+                    existingSession.inventory()
+                ));
+                existingSession.renderer().unmount(existingSession);
+                existing.reconciler.cleanup();
+
+                final ViewSession<D> session = renderer.remount(view, props);
+
+                // Update title without closing the inventory
+                final Component title = init.getTitle();
+                final String titleString = LegacyComponentSerializer.legacySection().serialize(title);
+
+                //noinspection deprecation
+                player.getOpenInventory().setTitle(titleString);
+
+                final ViewReconciler<Player> reconciler = new ViewReconciler<>(
+                    new IRenderContext.RenderContextCreator<Player, D, ClickContext, IRenderContext<Player, D, ClickContext>>() {
+                        @Override
+                        public @NotNull IRenderContext<Player, D, ClickContext> create(
+                            @NotNull final Map<Integer, ViewRenderable> renderables,
+                            @NotNull final Map<Integer, ClickHandler<Player, ClickContext>> clicks,
+                            @NotNull final Map<String, List<State<?>>> stateMap,
+                            @NotNull final Map<String, List<Ref<?>>> refMap,
+                            @NotNull final Map<String, List<Effect>> effectMap,
+                            @NotNull final Set<String> visited,
+                            @NotNull final Runnable requestUpdateFn
+                        ) {
+                            return new PaperRenderContext<>(
+                                props,
+                                new Scheduler() {
+                                    @Override
+                                    public @NotNull TaskHandle run(@NotNull final Runnable task) {
+                                        final TaskHandle handle = ViewManager.this.scheduler.run(task);
+
+                                        session.attachSchedulerTask(handle);
+
+                                        return () -> {
+                                            handle.cancel();
+                                            session.detachSchedulerTask(handle);
+                                        };
+                                    }
+
+                                    @Override
+                                    public @NotNull TaskHandle runLater(@NotNull final Runnable task, @NotNull final Duration delay) {
+                                        final TaskHandle handle = ViewManager.this.scheduler.runLater(task, delay);
+
+                                        session.attachSchedulerTask(handle);
+
+                                        return () -> {
+                                            handle.cancel();
+                                            session.detachSchedulerTask(handle);
+                                        };
+                                    }
+
+                                    @Override
+                                    public @NotNull TaskHandle runRepeating(@NotNull final Runnable task, @NotNull final Duration interval) {
+                                        final TaskHandle handle = ViewManager.this.scheduler.runRepeating(task, interval);
+
+                                        session.attachSchedulerTask(handle);
+
+                                        return () -> {
+                                            handle.cancel();
+                                            session.detachSchedulerTask(handle);
+                                        };
+                                    }
+                                },
+                                session,
+                                renderables,
+                                clicks,
+                                stateMap,
+                                refMap,
+                                effectMap,
+                                visited,
+                                requestUpdateFn,
+                                session.inventory(),
+                                width,
+                                height
+                            );
+                        }
+                    },
+                    session,
+                    renderer
+                );
+
+                reconciler.render();
+                this.sessions.put(player.getUniqueId(), new PlayerViewSession<D>(session, reconciler));
+
+                return;
+            }
+        }
+        final PaperInventoryRenderer<D> renderer = new PaperInventoryRenderer<>(requestedType);
         final ViewSession<D> session = renderer.mount(view, props, player, init.getTitle(), slots);
         final ViewReconciler<Player> reconciler = new ViewReconciler<>(
             new IRenderContext.RenderContextCreator<Player, D, ClickContext, IRenderContext<Player, D, ClickContext>>() {
@@ -598,7 +724,7 @@ public final class ViewManager {
          */
         @EventHandler
         private void onPlayerQuit(@NotNull final PlayerQuitEvent event) {
-            final org.bukkit.entity.Player player = event.getPlayer();
+            final Player player = event.getPlayer();
             final PlayerViewSession session = ViewManager.this.sessions.remove(player.getUniqueId());
 
             if (session == null) {

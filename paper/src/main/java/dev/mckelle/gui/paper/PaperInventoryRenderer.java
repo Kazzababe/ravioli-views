@@ -3,7 +3,6 @@ package dev.mckelle.gui.paper;
 import dev.mckelle.gui.api.interaction.ClickHandler;
 import dev.mckelle.gui.api.reconciliation.Patch;
 import dev.mckelle.gui.api.render.ViewRenderable;
-import dev.mckelle.gui.api.session.IViewSession;
 import dev.mckelle.gui.core.AbstractInventoryRenderer;
 import dev.mckelle.gui.paper.component.container.VirtualContainerViewComponent;
 import dev.mckelle.gui.paper.context.ClickContext;
@@ -83,15 +82,33 @@ public final class PaperInventoryRenderer<D> extends AbstractInventoryRenderer<P
     }
 
     /**
-     * Unmounts a view session by closing the player's inventory.
+     * Replaces the current session's root view while keeping the same Bukkit inventory open.
+     * <p>
+     * This method swaps the underlying {@link ViewSession} to point to the new root view and props,
+     * clears currently tracked renderables and click handlers, and updates the {@link ViewInventoryHolder}
+     * to reference the newly created session. No inventory close/open is performed.
+     * </p>
      *
-     * @param session the session to unmount
+     * @param newRoot the new root view to render into the existing inventory; never null
+     * @param props   the optional properties for the new root view; may be null
+     * @return the new {@link ViewSession} associated with this renderer
      */
-    @Override
-    public void unmount(@NotNull final IViewSession<Player, D> session) {
-        super.unmount(session);
+    public @NotNull ViewSession<D> remount(@NotNull final View<D> newRoot, @Nullable final D props) {
+        final Inventory inventory = this.session.inventory();
+        final Player viewer = this.session.getViewer();
 
-        this.session.getViewer().closeInventory();
+        // Clear existing state from previous view
+        this.renderables.clear();
+        this.clickMap.clear();
+        inventory.clear();
+
+        // Swap to a new session while keeping the same inventory instance
+        final ViewSession<D> newSession = new ViewSession<>(newRoot, props, viewer, inventory, this);
+
+        ((ViewInventoryHolder) inventory.getHolder()).setSession(newSession);
+        this.session = newSession;
+
+        return newSession;
     }
 
     /**
