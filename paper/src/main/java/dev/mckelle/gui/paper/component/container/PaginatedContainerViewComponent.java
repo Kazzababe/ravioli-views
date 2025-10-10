@@ -53,6 +53,31 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
     }
 
     /**
+     * Creates a Paper-specific paginated container (mask-based) with explicit refresh behavior.
+     *
+     * @param key             The key for the component.
+     * @param loader          data loader (page, pageSize, callback)
+     * @param renderer        per-cell item renderer
+     * @param clickMapper     optional per-item click mapper
+     * @param handleRef       ref that will receive the pagination handle
+     * @param loaderExecutor  optional executor on which to run the data loader (inline if {@code null})
+     * @param refreshBehavior behavior to use while a refresh/page-load is in progress
+     * @param mask            character mask rows
+     */
+    public PaginatedContainerViewComponent(
+        @Nullable final String key,
+        @NotNull final PaginatedContainerViewComponent.DataLoader<T> loader,
+        @NotNull final CellRenderer<Player, T> renderer,
+        @Nullable final PaginatedContainerViewComponent.CellClick<Player, T, ClickContext> clickMapper,
+        @NotNull final Ref<Handle> handleRef,
+        @Nullable final Executor loaderExecutor,
+        @NotNull final RefreshBehavior refreshBehavior,
+        @NotNull final String... mask
+    ) {
+        super(key, loader, renderer, clickMapper, handleRef, loaderExecutor, refreshBehavior, mask);
+    }
+
+    /**
      * Backwards-compatible constructor without click mapping and executor (mask-based).
      *
      * @param key       The key for the component.
@@ -94,6 +119,33 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
         @Nullable final Executor loaderExecutor
     ) {
         super(key, width, height, loader, renderer, clickMapper, handleRef, loaderExecutor);
+    }
+
+    /**
+     * Creates a Paper-specific paginated container (rectangular) with explicit refresh behavior.
+     *
+     * @param key             The key for the component.
+     * @param width           number of columns
+     * @param height          number of rows
+     * @param loader          data loader (page, pageSize, callback)
+     * @param renderer        per-cell item renderer
+     * @param clickMapper     optional per-item click mapper
+     * @param handleRef       ref that will receive the pagination handle
+     * @param loaderExecutor  optional executor on which to run the data loader (inline if {@code null})
+     * @param refreshBehavior behavior to use while a refresh/page-load is in progress
+     */
+    public PaginatedContainerViewComponent(
+        @Nullable final String key,
+        final int width,
+        final int height,
+        @NotNull final PaginatedContainerViewComponent.DataLoader<T> loader,
+        @NotNull final CellRenderer<Player, T> renderer,
+        @Nullable final PaginatedContainerViewComponent.CellClick<Player, T, ClickContext> clickMapper,
+        @NotNull final Ref<Handle> handleRef,
+        @Nullable final Executor loaderExecutor,
+        @NotNull final RefreshBehavior refreshBehavior
+    ) {
+        super(key, width, height, loader, renderer, clickMapper, handleRef, loaderExecutor, refreshBehavior);
     }
 
     /**
@@ -141,6 +193,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
         private Integer width;
         private Integer height;
         private Executor loaderExecutor;
+        private RefreshBehavior refreshBehavior;
         private String key;
         private final Map<Character, List<SlotConfigurer<Player, ClickContext>>> componentMappings = new HashMap<>();
 
@@ -194,6 +247,18 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
          */
         public @NotNull Builder<T> loaderExecutor(@NotNull final Executor executor) {
             this.loaderExecutor = executor;
+
+            return this;
+        }
+
+        /**
+         * Sets the refresh behavior that controls whether items are kept or removed during refresh.
+         *
+         * @param behavior refresh behavior
+         * @return this builder
+         */
+        public @NotNull Builder<T> refreshBehavior(@NotNull final RefreshBehavior behavior) {
+            this.refreshBehavior = behavior;
 
             return this;
         }
@@ -354,7 +419,9 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
                 throw new IllegalStateException("handleRef is required");
             }
             if (this.mask != null) {
-                final PaginatedContainerViewComponent<T> component = new PaginatedContainerViewComponent<>(this.key, this.loader, this.renderer, this.clickMapper, this.handleRef, this.loaderExecutor, this.mask);
+                final PaginatedContainerViewComponent<T> component = this.refreshBehavior == null
+                    ? new PaginatedContainerViewComponent<>(this.key, this.loader, this.renderer, this.clickMapper, this.handleRef, this.loaderExecutor, this.mask)
+                    : new PaginatedContainerViewComponent<>(this.key, this.loader, this.renderer, this.clickMapper, this.handleRef, this.loaderExecutor, this.refreshBehavior, this.mask);
 
                 for (final var entry : this.componentMappings.entrySet()) {
                     final char ch = entry.getKey();
@@ -366,7 +433,9 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
                 return component;
             }
             if (this.width != null && this.height != null) {
-                final PaginatedContainerViewComponent<T> component = new PaginatedContainerViewComponent<>(this.key, this.width, this.height, this.loader, this.renderer, this.clickMapper, this.handleRef, this.loaderExecutor);
+                final PaginatedContainerViewComponent<T> component = this.refreshBehavior == null
+                    ? new PaginatedContainerViewComponent<>(this.key, this.width, this.height, this.loader, this.renderer, this.clickMapper, this.handleRef, this.loaderExecutor)
+                    : new PaginatedContainerViewComponent<>(this.key, this.width, this.height, this.loader, this.renderer, this.clickMapper, this.handleRef, this.loaderExecutor, this.refreshBehavior);
 
                 for (final var entry : this.componentMappings.entrySet()) {
                     final char ch = entry.getKey();
@@ -390,9 +459,6 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
             return this;
         }
 
-        /**
-         * Maps a character to a static child component at each occurrence without props.
-         */
         /**
          * Maps a character to a static child component at each occurrence without props.
          *

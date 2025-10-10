@@ -38,8 +38,6 @@ public final class PaginatedView extends View<Object> {
                     final int totalItems = (int) Math.round(pageSize * 2.5);
                     final int startIndex = page * pageSize;
 
-                    System.out.println("PAGE = " + page);
-
                     if (startIndex >= totalItems) {
                         callback.accept(List.of(), totalItems);
 

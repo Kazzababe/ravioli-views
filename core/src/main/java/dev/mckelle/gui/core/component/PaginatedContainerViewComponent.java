@@ -11,6 +11,7 @@ import dev.mckelle.gui.api.state.IntegerRef;
 import dev.mckelle.gui.api.state.IntegerState;
 import dev.mckelle.gui.api.state.Ref;
 import dev.mckelle.gui.api.state.State;
+import dev.mckelle.gui.core.component.pagination.SuspendedRenderable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -38,6 +39,21 @@ import java.util.function.BiConsumer;
  * @param <RC> The render context type.
  */
 public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, RC extends IRenderContext<V, Void, CC>> extends ViewComponentBase<V, Void, RC> {
+    /**
+     * Controls how the container behaves visually while a refresh/page-load is in progress.
+     */
+    public enum RefreshBehavior {
+        /**
+         * Keep currently displayed items/renderables on screen until new data has finished loading,
+         * then swap to the newly loaded page. This avoids flicker and preserves SuspendedRenderable islands.
+         */
+        KEEP,
+        /**
+         * Clear items immediately when a refresh/page-load begins, restoring them only after the load completes.
+         */
+        REMOVE
+    }
+
     /**
      * Functional interface for configuring a slot at a mask occurrence to render a child component.
      * The configurer receives the occurrence index for the given character, the coordinates (x,y),
@@ -107,7 +123,6 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
          */
         @NotNull <K, X extends ViewComponentBase<V, K, ?>> SlotBuilder<V, C> component(@NotNull ViewComponentBase.Builder<?, X> builder, @Nullable K props);
     }
-
 
     /**
      * Loader interface for supplying items for a specific page and page size.
@@ -272,6 +287,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
     private final CellClick<V, T, CC> clickMapper;
     private final Ref<Handle> handleRef;
     private final Executor loaderExecutor;
+    private final RefreshBehavior refreshBehavior;
     private final Map<Character, List<SlotConfigurer<V, CC>>> componentConfigurers = new HashMap<>();
 
     /**
@@ -316,6 +332,51 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         this.clickMapper = clickMapper;
         this.handleRef = handleRef;
         this.loaderExecutor = loaderExecutor;
+        this.refreshBehavior = RefreshBehavior.KEEP;
+    }
+
+    /**
+     * Creates a new paginated container from a character mask with explicit refresh behavior.
+     *
+     * @param key             The key for the component.
+     * @param loader          data loader (page, pageSize, callback)
+     * @param renderer        per-cell item renderer
+     * @param clickMapper     Optional mapper that returns a click handler per item; may be {@code null} for no clicks.
+     * @param handleRef       A {@link Ref} that will be populated with the {@link Handle} on first render.
+     * @param loaderExecutor  Optional executor to run the data loader on; if {@code null}, runs inline.
+     * @param refreshBehavior Behavior to use while a refresh/page-load is in progress.
+     * @param mask            The layout mask rows. All rows must have the same length.
+     */
+    public PaginatedContainerViewComponent(
+        @Nullable final String key,
+        @NotNull final DataLoader<T> loader,
+        @NotNull final CellRenderer<V, T> renderer,
+        @Nullable final CellClick<V, T, CC> clickMapper,
+        @NotNull final Ref<Handle> handleRef,
+        @Nullable final Executor loaderExecutor,
+        @NotNull final RefreshBehavior refreshBehavior,
+        @NotNull final String... mask
+    ) {
+        super(key);
+
+        if (mask.length == 0) {
+            throw new IllegalArgumentException("mask must contain rows");
+        }
+        final int width = mask[0].length();
+
+        for (final String row : mask) {
+            if (row.length() != width) {
+                throw new IllegalArgumentException("all rows must be same length");
+            }
+        }
+        this.mask = mask.clone();
+        this.recomputeSlots();
+        this.loader = loader;
+        this.renderer = renderer;
+        this.clickMapper = clickMapper;
+        this.handleRef = handleRef;
+        this.loaderExecutor = loaderExecutor;
+        this.refreshBehavior = refreshBehavior == null ? RefreshBehavior.KEEP : refreshBehavior;
     }
 
     /**
@@ -334,7 +395,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         @NotNull final Ref<Handle> handleRef,
         @NotNull final String... mask
     ) {
-        this(key, loader, renderer, null, handleRef, null, mask);
+        this(key, loader, renderer, null, handleRef, null, RefreshBehavior.KEEP, mask);
     }
 
     /**
@@ -359,7 +420,34 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         @NotNull final Ref<Handle> handleRef,
         @Nullable final Executor loaderExecutor
     ) {
-        this(key, loader, renderer, clickMapper, handleRef, loaderExecutor, rectMask(width, height));
+        this(key, loader, renderer, clickMapper, handleRef, loaderExecutor, RefreshBehavior.KEEP, rectMask(width, height));
+    }
+
+    /**
+     * Convenience rectangular constructor with optional click mapper, executor, and explicit refresh behavior.
+     *
+     * @param key            The key for the component.
+     * @param width          number of columns
+     * @param height         number of rows
+     * @param loader         data loader (page, pageSize, callback)
+     * @param renderer       per-cell item renderer
+     * @param clickMapper    optional per-item click mapper
+     * @param handleRef      ref that will receive the pagination handle
+     * @param loaderExecutor optional executor to run the data loader (inline if {@code null})
+     * @param refreshBehavior behavior to use while a refresh/page-load is in progress
+     */
+    public PaginatedContainerViewComponent(
+        @Nullable final String key,
+        final int width,
+        final int height,
+        @NotNull final DataLoader<T> loader,
+        @NotNull final CellRenderer<V, T> renderer,
+        @Nullable final CellClick<V, T, CC> clickMapper,
+        @NotNull final Ref<Handle> handleRef,
+        @Nullable final Executor loaderExecutor,
+        @NotNull final RefreshBehavior refreshBehavior
+    ) {
+        this(key, loader, renderer, clickMapper, handleRef, loaderExecutor, refreshBehavior, rectMask(width, height));
     }
 
     /**
@@ -380,7 +468,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         @NotNull final CellRenderer<V, T> renderer,
         @NotNull final Ref<Handle> handleRef
     ) {
-        this(key, loader, renderer, null, handleRef, null, rectMask(width, height));
+        this(key, loader, renderer, null, handleRef, null, RefreshBehavior.KEEP, rectMask(width, height));
     }
 
     private static @NotNull String[] rectMask(final int width, final int height) {
@@ -470,6 +558,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         }
         final IntegerState page = context.useState(0);
         final State<List<T>> items = context.useState(Collections.emptyList());
+        final State<List<T>> displayItems = context.useState(Collections.emptyList());
         final IntegerState pages = context.useState(-1);
         final BooleanState refresh = context.useState(false);
 
@@ -515,10 +604,13 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
             context.batch(() -> {
                 refresh.set(false);
                 items.set(Collections.emptyList());
+
+                if (this.refreshBehavior == RefreshBehavior.REMOVE) {
+                    displayItems.set(Collections.emptyList());
+                }
             });
 
             final int target = page.get();
-
             final BiConsumer<List<T>, Integer> callback = (list, total) ->
                 context.getScheduler().run(() -> {
                     // Drop stale responses.
@@ -530,6 +622,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
 
                     context.batch(() -> {
                         items.set(list);
+                        displayItems.set(list);
                         pages.set((int) Math.ceil(total / (double) capacity));
                     });
                 });
@@ -540,26 +633,27 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
                 this.loader.load(target, capacity, callback);
             }
         }
-        final List<T> data = items.get();
+        final List<T> data = displayItems.get();
 
         for (int i = 0; i < data.size() && i < capacity; i++) {
+            final int index = i;
             final int[] pos = this.slots.get(i);
             final int x = pos[0];
             final int y = pos[1];
             final T value = data.get(i);
-            final ViewRenderable renderable = this.renderer.render(value, i);
 
-            if (this.clickMapper != null) {
-                final ClickHandler<V, CC> click = this.clickMapper.onClick(value, i);
-
-                if (click != null) {
-                    context.set(x, y, renderable, click);
-                } else {
-                    context.set(x, y, renderable);
-                }
-            } else {
-                context.set(x, y, renderable);
-            }
+            context.set(
+                x,
+                y,
+                new SuspendedRenderable<>(
+                    () -> this.renderer.render(value, index),
+                    this.clickMapper == null ?
+                        null :
+                        this.clickMapper.onClick(value, index),
+                    this.loaderExecutor
+                ),
+                new SuspendedRenderable.Props(value)
+            );
         }
     }
 

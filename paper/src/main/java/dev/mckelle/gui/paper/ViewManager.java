@@ -4,7 +4,6 @@ import dev.mckelle.gui.api.context.IRenderContext;
 import dev.mckelle.gui.api.interaction.ClickHandler;
 import dev.mckelle.gui.api.render.ViewRenderable;
 import dev.mckelle.gui.api.schedule.Scheduler;
-import dev.mckelle.gui.api.session.IViewSession;
 import dev.mckelle.gui.api.state.Ref;
 import dev.mckelle.gui.api.state.State;
 import dev.mckelle.gui.api.state.effect.Effect;
@@ -206,8 +205,7 @@ public final class ViewManager {
                 canReuse = currentInventory.getSize() == slots; // Same number of slots (9 * rows)
             }
             if (canReuse) {
-                @SuppressWarnings("unchecked")
-                final ViewSession<D> existingSession = (ViewSession<D>) existing.session;
+                @SuppressWarnings("unchecked") final ViewSession<D> existingSession = (ViewSession<D>) existing.session;
                 final PaperInventoryRenderer<D> renderer = existingSession.renderer();
 
                 existingSession.getRoot().close(new CloseContext<>(
