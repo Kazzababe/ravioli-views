@@ -91,9 +91,9 @@ public final class InitContext<D> implements IInitContext<Player, D> {
     @Override
     public void size(final int rows) {
         if (rows > 0 && rows % 9 == 0) {
-            this.rows = Math.clamp(rows / 9, 1, 6);
+            this.rows = Math.max(1, Math.min(rows / 9, 6));
         } else {
-            this.rows = Math.clamp(rows, 1, 6);
+            this.rows = Math.max(1, Math.min(rows, 6));
         }
     }
 

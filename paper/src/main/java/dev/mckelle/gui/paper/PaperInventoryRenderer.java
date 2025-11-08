@@ -159,8 +159,8 @@ public final class PaperInventoryRenderer<D> extends AbstractInventoryRenderer<P
      */
     @Override
     protected @NotNull ItemStack toPlatformItem(@NotNull final ViewRenderable renderable) {
-        if (renderable instanceof PaperComponents.ItemRenderable(final ItemStack stack)) {
-            return stack;
+        if (renderable instanceof final PaperComponents.ItemRenderable itemRenderable) {
+            return itemRenderable.stack();
         }
         throw new IllegalArgumentException("Unsupported renderable: " + renderable);
     }
@@ -177,9 +177,11 @@ public final class PaperInventoryRenderer<D> extends AbstractInventoryRenderer<P
         final List<Patch.Diff> normal = new ArrayList<>();
 
         for (final Patch.Diff diff : patch.diffs()) {
-            if (diff instanceof Patch.Set(
-                final int slot, final ViewRenderable renderable, final ClickHandler<?, ?> click
-            )) {
+            if (diff instanceof final Patch.Set set) {
+                final int slot = set.slot();
+                final ViewRenderable renderable = set.renderable();
+                final ClickHandler<?, ?> click = set.click();
+                
                 if (renderable instanceof VirtualContainerViewComponent.EditableSlot) {
                     this.renderables.put(slot, renderable);
                     this.clickMap.remove(slot);
@@ -193,9 +195,9 @@ public final class PaperInventoryRenderer<D> extends AbstractInventoryRenderer<P
                 } else {
                     this.clickMap.remove(slot);
                 }
-            } else if (diff instanceof Patch.Clear(final int slot)) {
-                this.renderables.remove(slot);
-                this.clickMap.remove(slot);
+            } else if (diff instanceof final Patch.Clear clear) {
+                this.renderables.remove(clear.slot());
+                this.clickMap.remove(clear.slot());
             }
             normal.add(diff);
         }

@@ -10,7 +10,7 @@ plugins {
 
 allprojects {
     group = "dev.mckelle"
-    version = "1.1.14"
+    version = "1.1.17"
 }
 
 val projectName = "Ravioli Views"
@@ -39,6 +39,9 @@ subprojects {
     }
 
     java {
+        toolchain {
+            languageVersion.set(JavaLanguageVersion.of(17))
+        }
         withSourcesJar()
         withJavadocJar()
     }

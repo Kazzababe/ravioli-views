@@ -55,8 +55,8 @@ public abstract class AbstractInventoryRenderer<V, D, K, V2 extends ViewBase<V, 
                 final K item = this.toPlatformItem(set.renderable());
 
                 this.setItem(set.slot(), item);
-            } else if (diff instanceof Patch.Clear(final int slot)) {
-                this.clearItem(slot);
+            } else if (diff instanceof final Patch.Clear clear) {
+                this.clearItem(clear.slot());
             }
         }
     }

@@ -44,6 +44,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -188,7 +189,7 @@ public final class ViewManager {
             }
             case CHEST -> {
                 width = 9;
-                height = Math.clamp(init.getSize(), 1, 6);
+                height = Math.max(1, Math.min(init.getSize(), 6));
             }
             default -> throw new IllegalArgumentException("Unsupported inventory type " + requestedType);
         }
@@ -295,7 +296,7 @@ public final class ViewManager {
                 );
 
                 reconciler.render();
-                this.sessions.put(player.getUniqueId(), new PlayerViewSession<D>(session, reconciler));
+                this.sessions.put(player.getUniqueId(), new PlayerViewSession<D>(session, reconciler, new AtomicLong(0)));
 
                 return;
             }
@@ -375,7 +376,7 @@ public final class ViewManager {
         );
 
         reconciler.render();
-        this.sessions.put(player.getUniqueId(), new PlayerViewSession<D>(session, reconciler));
+        this.sessions.put(player.getUniqueId(), new PlayerViewSession<D>(session, reconciler, new AtomicLong(0)));
     }
 
     /**
@@ -399,8 +400,19 @@ public final class ViewManager {
             if (playerSession == null || event.getView().getTopInventory() != playerSession.session.inventory()) {
                 return;
             }
+            final long now = System.currentTimeMillis();
+            final long lastClicked = playerSession.lastInteracted.get();
+            final long elapsed = now - lastClicked;
+
+            if (elapsed < 50) {
+                event.setCancelled(true);
+
+                return;
+            }
             final Inventory topInventory = playerSession.session.inventory();
             final Inventory clickedInventory = event.getClickedInventory();
+
+            playerSession.lastInteracted.set(now);
 
             if (event.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY
                 && clickedInventory != null
@@ -542,10 +554,9 @@ public final class ViewManager {
             // Clicked in top inventory
             final ViewRenderable renderable = playerSession.session.renderer().renderables().get(event.getRawSlot());
 
-            if (renderable instanceof VirtualContainerViewComponent.EditableSlot(
-                final Predicate<ItemStack> filter,
-                final Consumer<VirtualContainerViewComponent.ChangeEvent> onChange
-            )) {
+            if (renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot) {
+                final Predicate<ItemStack> filter = editableSlot.filter();
+                final Consumer<VirtualContainerViewComponent.ChangeEvent> onChange = editableSlot.onChange();
                 // Determine the incoming stack for all relevant "place into top" actions
                 final ItemStack candidateToPlace;
 
@@ -634,9 +645,20 @@ public final class ViewManager {
             if (topInventory != session.session.inventory()) {
                 return;
             }
+            final long now = System.currentTimeMillis();
+            final long lastClicked = session.lastInteracted.get();
+            final long elapsed = now - lastClicked;
+
+            if (elapsed < 50) {
+                event.setCancelled(true);
+
+                return;
+            }
             final ItemStack draggedItem = event.getOldCursor();
 
-            if (draggedItem.getType().isAir()) {
+            session.lastInteracted.set(now);
+
+            if (draggedItem.isEmpty()) {
                 return;
             }
             final Map<Integer, ItemStack> oldItems = new HashMap<>();
@@ -738,7 +760,11 @@ public final class ViewManager {
         }
     }
 
-    private record PlayerViewSession<D>(@NotNull ViewSession<D> session, @NotNull ViewReconciler<Player> reconciler) {
+    private record PlayerViewSession<D>(
+        @NotNull ViewSession<D> session,
+        @NotNull ViewReconciler<Player> reconciler,
+        @NotNull AtomicLong lastInteracted
+    ) {
 
     }
 }

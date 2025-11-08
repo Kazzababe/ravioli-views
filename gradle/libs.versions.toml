@@ -1,6 +1,6 @@
 [versions]
 jetbrains = "26.0.2"
-paper = "1.21.1-R0.1-SNAPSHOT"
+paper = "1.20.4-R0.1-SNAPSHOT"
 
 [libraries]
 jetbrains-annotations = { module = "org.jetbrains:annotations", version.ref = "jetbrains" }
