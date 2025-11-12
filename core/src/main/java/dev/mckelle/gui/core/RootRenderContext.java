@@ -160,6 +160,7 @@ public abstract class RootRenderContext<V, D, C extends IClickContext<V>> implem
         final List<?> lastDependencies = record.lastDependencies().get();
 
         if (lastDependencies == null || !Objects.equals(lastDependencies, dependencies)) {
+            record.lastDependencies().set(dependencies);
             // Defer running effects until after the current render has completed.
             // This avoids executing side-effects during render and prevents races
             // with child components
@@ -171,7 +172,6 @@ public abstract class RootRenderContext<V, D, C extends IClickContext<V>> implem
                 final Runnable newCleanup = effect.get();
 
                 record.cleanup().set(newCleanup);
-                record.lastDependencies().set(dependencies);
             });
         }
     }

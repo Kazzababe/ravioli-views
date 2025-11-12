@@ -255,6 +255,24 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
          * Force the data loader to refetch it's contents.
          */
         void refresh();
+        
+        /**
+         * Checks if the previous page is available.
+         *
+         * @return {@code true} if the previous page is available, {@code false} otherwise.
+         */
+        default boolean hasPrevious() {
+            return this.currentPage() > 0;
+        }
+
+        /**
+         * Checks if the next page is available.
+         *
+         * @return {@code true} if the next page is available, {@code false} otherwise.
+         */
+        default boolean hasNext() {
+            return this.currentPage() < this.totalPages() - 1;
+        }
     }
 
     /**
@@ -287,7 +305,9 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
     private final CellClick<V, T, CC> clickMapper;
     private final Ref<Handle> handleRef;
     private final Executor loaderExecutor;
+    private final Executor renderExecutor;
     private final RefreshBehavior refreshBehavior;
+    private final boolean useSuspendedRenderables;
     private final Map<Character, List<SlotConfigurer<V, CC>>> componentConfigurers = new HashMap<>();
 
     /**
@@ -302,6 +322,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      * @param clickMapper    Optional mapper that returns a click handler per item; may be {@code null} for no clicks.
      * @param handleRef      A {@link Ref} that will be populated with the {@link Handle} on first render.
      * @param loaderExecutor Optional executor to run the data loader on; if {@code null}, runs inline.
+     * @param renderExecutor Optional executor to run the render on; if {@code null}, runs inline.
      * @param mask           The layout mask rows. All rows must have the same length.
      */
     public PaginatedContainerViewComponent(
@@ -311,28 +332,10 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         @Nullable final CellClick<V, T, CC> clickMapper,
         @NotNull final Ref<Handle> handleRef,
         @Nullable final Executor loaderExecutor,
+        @Nullable final Executor renderExecutor,
         @NotNull final String... mask
     ) {
-        super(key);
-
-        if (mask.length == 0) {
-            throw new IllegalArgumentException("mask must contain rows");
-        }
-        final int width = mask[0].length();
-
-        for (final String row : mask) {
-            if (row.length() != width) {
-                throw new IllegalArgumentException("all rows must be same length");
-            }
-        }
-        this.mask = mask.clone();
-        this.recomputeSlots();
-        this.loader = loader;
-        this.renderer = renderer;
-        this.clickMapper = clickMapper;
-        this.handleRef = handleRef;
-        this.loaderExecutor = loaderExecutor;
-        this.refreshBehavior = RefreshBehavior.KEEP;
+        this(key, loader, renderer, clickMapper, handleRef, loaderExecutor, renderExecutor, RefreshBehavior.KEEP, true, mask);
     }
 
     /**
@@ -344,6 +347,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      * @param clickMapper     Optional mapper that returns a click handler per item; may be {@code null} for no clicks.
      * @param handleRef       A {@link Ref} that will be populated with the {@link Handle} on first render.
      * @param loaderExecutor  Optional executor to run the data loader on; if {@code null}, runs inline.
+     * @param renderExecutor  Optional executor to run the render on; if {@code null}, runs inline.
      * @param refreshBehavior Behavior to use while a refresh/page-load is in progress.
      * @param mask            The layout mask rows. All rows must have the same length.
      */
@@ -354,29 +358,11 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         @Nullable final CellClick<V, T, CC> clickMapper,
         @NotNull final Ref<Handle> handleRef,
         @Nullable final Executor loaderExecutor,
+        @Nullable final Executor renderExecutor,
         @NotNull final RefreshBehavior refreshBehavior,
         @NotNull final String... mask
     ) {
-        super(key);
-
-        if (mask.length == 0) {
-            throw new IllegalArgumentException("mask must contain rows");
-        }
-        final int width = mask[0].length();
-
-        for (final String row : mask) {
-            if (row.length() != width) {
-                throw new IllegalArgumentException("all rows must be same length");
-            }
-        }
-        this.mask = mask.clone();
-        this.recomputeSlots();
-        this.loader = loader;
-        this.renderer = renderer;
-        this.clickMapper = clickMapper;
-        this.handleRef = handleRef;
-        this.loaderExecutor = loaderExecutor;
-        this.refreshBehavior = refreshBehavior == null ? RefreshBehavior.KEEP : refreshBehavior;
+        this(key, loader, renderer, clickMapper, handleRef, loaderExecutor, renderExecutor, refreshBehavior, true, mask);
     }
 
     /**
@@ -395,7 +381,57 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         @NotNull final Ref<Handle> handleRef,
         @NotNull final String... mask
     ) {
-        this(key, loader, renderer, null, handleRef, null, RefreshBehavior.KEEP, mask);
+        this(key, loader, renderer, null, handleRef, null, null, RefreshBehavior.KEEP, mask);
+    }
+
+    /**
+     * Internal constructor with full control over all pagination options.
+     *
+     * @param key                     The key for the component.
+     * @param loader                  data loader (page, pageSize, callback)
+     * @param renderer                per-cell item renderer
+     * @param clickMapper             optional per-item click mapper
+     * @param handleRef               ref that will receive the pagination handle
+     * @param loaderExecutor          optional executor to run the data loader (inline if {@code null})
+     * @param renderExecutor          optional executor to run the render (inline if {@code null})
+     * @param refreshBehavior         behavior to use while a refresh/page-load is in progress
+     * @param useSuspendedRenderables {@code true} to wrap cells in SuspendedRenderable, {@code false} to render synchronously
+     * @param mask                    character mask rows
+     */
+    protected PaginatedContainerViewComponent(
+        @Nullable final String key,
+        @NotNull final DataLoader<T> loader,
+        @NotNull final CellRenderer<V, T> renderer,
+        @Nullable final CellClick<V, T, CC> clickMapper,
+        @NotNull final Ref<Handle> handleRef,
+        @Nullable final Executor loaderExecutor,
+        @Nullable final Executor renderExecutor,
+        @NotNull final RefreshBehavior refreshBehavior,
+        final boolean useSuspendedRenderables,
+        @NotNull final String[] mask
+    ) {
+        super(key);
+
+        if (mask.length == 0) {
+            throw new IllegalArgumentException("mask must contain rows");
+        }
+        final int width = mask[0].length();
+
+        for (final String row : mask) {
+            if (row.length() != width) {
+                throw new IllegalArgumentException("all rows must be same length");
+            }
+        }
+        this.mask = mask.clone();
+        this.recomputeSlots();
+        this.loader = loader;
+        this.renderer = renderer;
+        this.clickMapper = clickMapper;
+        this.handleRef = handleRef;
+        this.loaderExecutor = loaderExecutor;
+        this.renderExecutor = renderExecutor;
+        this.refreshBehavior = refreshBehavior == null ? RefreshBehavior.KEEP : refreshBehavior;
+        this.useSuspendedRenderables = useSuspendedRenderables;
     }
 
     /**
@@ -409,6 +445,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      * @param clickMapper    optional per-item click mapper
      * @param handleRef      ref that will receive the pagination handle
      * @param loaderExecutor optional executor to run the data loader (inline if {@code null})
+     * @param renderExecutor optional executor to run the render (inline if {@code null})
      */
     public PaginatedContainerViewComponent(
         @Nullable final String key,
@@ -418,9 +455,10 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         @NotNull final CellRenderer<V, T> renderer,
         @Nullable final CellClick<V, T, CC> clickMapper,
         @NotNull final Ref<Handle> handleRef,
-        @Nullable final Executor loaderExecutor
+        @Nullable final Executor loaderExecutor,
+        @Nullable final Executor renderExecutor
     ) {
-        this(key, loader, renderer, clickMapper, handleRef, loaderExecutor, RefreshBehavior.KEEP, rectMask(width, height));
+        this(key, loader, renderer, clickMapper, handleRef, loaderExecutor, renderExecutor, RefreshBehavior.KEEP, rectMask(width, height));
     }
 
     /**
@@ -434,6 +472,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
      * @param clickMapper    optional per-item click mapper
      * @param handleRef      ref that will receive the pagination handle
      * @param loaderExecutor optional executor to run the data loader (inline if {@code null})
+     * @param renderExecutor optional executor to run the render (inline if {@code null})
      * @param refreshBehavior behavior to use while a refresh/page-load is in progress
      */
     public PaginatedContainerViewComponent(
@@ -445,9 +484,10 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         @Nullable final CellClick<V, T, CC> clickMapper,
         @NotNull final Ref<Handle> handleRef,
         @Nullable final Executor loaderExecutor,
+        @Nullable final Executor renderExecutor,
         @NotNull final RefreshBehavior refreshBehavior
     ) {
-        this(key, loader, renderer, clickMapper, handleRef, loaderExecutor, refreshBehavior, rectMask(width, height));
+        this(key, loader, renderer, clickMapper, handleRef, loaderExecutor, renderExecutor, refreshBehavior, rectMask(width, height));
     }
 
     /**
@@ -468,7 +508,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
         @NotNull final CellRenderer<V, T> renderer,
         @NotNull final Ref<Handle> handleRef
     ) {
-        this(key, loader, renderer, null, handleRef, null, RefreshBehavior.KEEP, rectMask(width, height));
+        this(key, loader, renderer, null, handleRef, null, null, RefreshBehavior.KEEP, rectMask(width, height));
     }
 
     private static @NotNull String[] rectMask(final int width, final int height) {
@@ -641,19 +681,35 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
             final int x = pos[0];
             final int y = pos[1];
             final T value = data.get(i);
+            
+            if (this.useSuspendedRenderables) {
+                context.set(
+                    x,
+                    y,
+                    new SuspendedRenderable<>(
+                        () -> this.renderer.render(value, index),
+                        this.clickMapper == null ?
+                            null :
+                            this.clickMapper.onClick(value, index),
+                        this.renderExecutor
+                    ),
+                    new SuspendedRenderable.Props(value)
+                );
+            } else {
+                final ViewRenderable renderable = this.renderer.render(value, index);
 
-            context.set(
-                x,
-                y,
-                new SuspendedRenderable<>(
-                    () -> this.renderer.render(value, index),
-                    this.clickMapper == null ?
-                        null :
-                        this.clickMapper.onClick(value, index),
-                    this.loaderExecutor
-                ),
-                new SuspendedRenderable.Props(value)
-            );
+                if (this.clickMapper == null) {
+                    context.set(x, y, renderable);
+                } else {
+                    final ClickHandler<V, CC> clickHandler = this.clickMapper.onClick(value, index);
+
+                    if (clickHandler == null) {
+                        context.set(x, y, renderable);
+                    } else {
+                        context.set(x, y, renderable, clickHandler);
+                    }
+                }
+            }
         }
     }
 

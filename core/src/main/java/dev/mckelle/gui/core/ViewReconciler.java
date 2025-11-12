@@ -41,6 +41,10 @@ public final class ViewReconciler<V> {
     private final Set<String> prevVisitedKeys = new HashSet<>();
 
     private boolean rendering;
+    private long lastRenderTickId = Long.MIN_VALUE;
+    private int rendersThisTick = 0;
+    private long lastRenderWindowStartNanos = 0L;
+    private boolean guardTrippedInCurrentTick = false;
 
     /**
      * Creates a new ViewReconciler for the specified view session.
@@ -67,10 +71,15 @@ public final class ViewReconciler<V> {
         if (this.rendering) {
             return;
         }
+        final RenderDebugOptions debugOptions = ViewDebug.options();
+
+        if (this.shouldAbortRender(debugOptions)) {
+            return;
+        }
         this.rendering = true;
 
         try {
-            this.doRender();
+            this.doRender(debugOptions);
         } finally {
             this.rendering = false;
         }
@@ -82,7 +91,7 @@ public final class ViewReconciler<V> {
      * and applies only the necessary changes through patches.
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
-    public void doRender() {
+    private void doRender(@NotNull final RenderDebugOptions debugOptions) {
         final Map<Integer, ViewRenderable> nextItems = new HashMap<>();
         final Map<Integer, ClickHandler<V, ?>> nextClicks = new HashMap<>();
         final Set<String> visited = new HashSet<>();
@@ -139,6 +148,12 @@ public final class ViewReconciler<V> {
                 diffs.add(new Patch.Clear(slot));
             }
         }
+        if (debugOptions.traceRenderPaths()) {
+            final List<String> sortedVisited = new ArrayList<>(visited);
+
+            sortedVisited.sort(String::compareTo);
+            ViewDebug.log("Render trace [" + this.describeView() + "]: visited=" + sortedVisited + ", diffs=" + diffs.size());
+        }
         this.renderer.apply(new Patch(diffs));
 
         this.prevItems.clear();
@@ -149,6 +164,45 @@ public final class ViewReconciler<V> {
 
         this.prevVisitedKeys.clear();
         this.prevVisitedKeys.addAll(visited);
+    }
+
+    private boolean shouldAbortRender(@NotNull final RenderDebugOptions options) {
+        if (options.maxConsecutiveRendersPerTick() <= 0) {
+            return false;
+        }
+        final long suppliedTick = options.tickSupplier().getAsLong();
+
+        if (suppliedTick != Long.MIN_VALUE) {
+            if (suppliedTick != this.lastRenderTickId) {
+                this.lastRenderTickId = suppliedTick;
+                this.rendersThisTick = 0;
+                this.guardTrippedInCurrentTick = false;
+            }
+        } else {
+            final long now = System.nanoTime();
+
+            if (this.lastRenderWindowStartNanos == 0L || now - this.lastRenderWindowStartNanos > options.sameTickWindowNanos()) {
+                this.lastRenderWindowStartNanos = now;
+                this.rendersThisTick = 0;
+                this.guardTrippedInCurrentTick = false;
+            }
+        }
+        this.rendersThisTick++;
+
+        if (this.rendersThisTick > options.maxConsecutiveRendersPerTick()) {
+            if (!this.guardTrippedInCurrentTick) {
+                ViewDebug.log("Render loop guard tripped for " + this.describeView() + " after " + this.rendersThisTick + " renders in the current window");
+                this.guardTrippedInCurrentTick = true;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private @NotNull String describeView() {
+        final ViewBase<?, ?, ?, ?, ?, ?> root = (ViewBase<?, ?, ?, ?, ?, ?>) this.instance.getRoot();
+
+        return root.getClass().getSimpleName();
     }
 
     /**

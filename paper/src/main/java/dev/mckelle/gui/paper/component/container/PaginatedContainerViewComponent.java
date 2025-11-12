@@ -38,6 +38,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
      * @param clickMapper    optional per-item click mapper
      * @param handleRef      ref that will receive the pagination handle
      * @param loaderExecutor optional executor on which to run the data loader (inline if {@code null})
+     * @param renderExecutor optional executor on which to run the render (inline if {@code null})
      * @param mask           character mask rows
      */
     public PaginatedContainerViewComponent(
@@ -47,9 +48,10 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
         @Nullable final PaginatedContainerViewComponent.CellClick<Player, T, ClickContext> clickMapper,
         @NotNull final Ref<Handle> handleRef,
         @Nullable final Executor loaderExecutor,
+        @Nullable final Executor renderExecutor,
         @NotNull final String... mask
     ) {
-        super(key, loader, renderer, clickMapper, handleRef, loaderExecutor, mask);
+        super(key, loader, renderer, clickMapper, handleRef, loaderExecutor, renderExecutor, mask);
     }
 
     /**
@@ -61,6 +63,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
      * @param clickMapper     optional per-item click mapper
      * @param handleRef       ref that will receive the pagination handle
      * @param loaderExecutor  optional executor on which to run the data loader (inline if {@code null})
+     * @param renderExecutor  optional executor on which to run the render (inline if {@code null})
      * @param refreshBehavior behavior to use while a refresh/page-load is in progress
      * @param mask            character mask rows
      */
@@ -71,10 +74,11 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
         @Nullable final PaginatedContainerViewComponent.CellClick<Player, T, ClickContext> clickMapper,
         @NotNull final Ref<Handle> handleRef,
         @Nullable final Executor loaderExecutor,
+        @Nullable final Executor renderExecutor,
         @NotNull final RefreshBehavior refreshBehavior,
         @NotNull final String... mask
     ) {
-        super(key, loader, renderer, clickMapper, handleRef, loaderExecutor, refreshBehavior, mask);
+        super(key, loader, renderer, clickMapper, handleRef, loaderExecutor, renderExecutor, refreshBehavior, mask);
     }
 
     /**
@@ -96,6 +100,21 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
         super(key, loader, renderer, handleRef, mask);
     }
 
+    PaginatedContainerViewComponent(
+        @Nullable final String key,
+        @NotNull final PaginatedContainerViewComponent.DataLoader<T> loader,
+        @NotNull final CellRenderer<Player, T> renderer,
+        @Nullable final PaginatedContainerViewComponent.CellClick<Player, T, ClickContext> clickMapper,
+        @NotNull final Ref<Handle> handleRef,
+        @Nullable final Executor loaderExecutor,
+        @Nullable final Executor renderExecutor,
+        @NotNull final RefreshBehavior refreshBehavior,
+        final boolean useSuspendedRenderables,
+        @NotNull final String[] mask
+    ) {
+        super(key, loader, renderer, clickMapper, handleRef, loaderExecutor, renderExecutor, refreshBehavior, useSuspendedRenderables, mask);
+    }
+
     /**
      * Creates a Paper-specific paginated container (rectangular) with optional click mapper and executor.
      *
@@ -107,6 +126,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
      * @param clickMapper    optional per-item click mapper
      * @param handleRef      ref that will receive the pagination handle
      * @param loaderExecutor optional executor on which to run the data loader (inline if {@code null})
+     * @param renderExecutor optional executor on which to run the render (inline if {@code null})
      */
     public PaginatedContainerViewComponent(
         @Nullable final String key,
@@ -116,9 +136,10 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
         @NotNull final CellRenderer<Player, T> renderer,
         @Nullable final PaginatedContainerViewComponent.CellClick<Player, T, ClickContext> clickMapper,
         @NotNull final Ref<Handle> handleRef,
-        @Nullable final Executor loaderExecutor
+        @Nullable final Executor loaderExecutor,
+        @Nullable final Executor renderExecutor
     ) {
-        super(key, width, height, loader, renderer, clickMapper, handleRef, loaderExecutor);
+        super(key, width, height, loader, renderer, clickMapper, handleRef, loaderExecutor, renderExecutor);
     }
 
     /**
@@ -132,6 +153,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
      * @param clickMapper     optional per-item click mapper
      * @param handleRef       ref that will receive the pagination handle
      * @param loaderExecutor  optional executor on which to run the data loader (inline if {@code null})
+     * @param renderExecutor  optional executor on which to run the render (inline if {@code null})
      * @param refreshBehavior behavior to use while a refresh/page-load is in progress
      */
     public PaginatedContainerViewComponent(
@@ -143,9 +165,10 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
         @Nullable final PaginatedContainerViewComponent.CellClick<Player, T, ClickContext> clickMapper,
         @NotNull final Ref<Handle> handleRef,
         @Nullable final Executor loaderExecutor,
+        @Nullable final Executor renderExecutor,
         @NotNull final RefreshBehavior refreshBehavior
     ) {
-        super(key, width, height, loader, renderer, clickMapper, handleRef, loaderExecutor, refreshBehavior);
+        super(key, width, height, loader, renderer, clickMapper, handleRef, loaderExecutor, renderExecutor, refreshBehavior);
     }
 
     /**
@@ -193,7 +216,9 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
         private Integer width;
         private Integer height;
         private Executor loaderExecutor;
+        private Executor renderExecutor;
         private RefreshBehavior refreshBehavior;
+        private boolean useSuspendedRenderables = false;
         private String key;
         private final Map<Character, List<SlotConfigurer<Player, ClickContext>>> componentMappings = new HashMap<>();
 
@@ -252,6 +277,18 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
         }
 
         /**
+         * Sets a custom executor for running the render. If not provided, the render runs inline.
+         *
+         * @param executor executor on which to execute the render
+         * @return this builder
+         */
+        public @NotNull Builder<T> renderExecutor(@NotNull final Executor executor) {
+            this.renderExecutor = executor;
+
+            return this;
+        }
+
+        /**
          * Sets the refresh behavior that controls whether items are kept or removed during refresh.
          *
          * @param behavior refresh behavior
@@ -259,6 +296,19 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
          */
         public @NotNull Builder<T> refreshBehavior(@NotNull final RefreshBehavior behavior) {
             this.refreshBehavior = behavior;
+
+            return this;
+        }
+
+        /**
+         * Controls whether each cell is rendered through {@link dev.mckelle.gui.core.component.pagination.SuspendedRenderable}.
+         * Disable when cell rendering is inexpensive and you want to minimise follow-up renders.
+         *
+         * @param useSuspendedRenderables {@code true} to keep using SuspendedRenderable, {@code false} (default) to render synchronously
+         * @return this builder
+         */
+        public @NotNull Builder<T> useSuspendedRenderables(final boolean useSuspendedRenderables) {
+            this.useSuspendedRenderables = useSuspendedRenderables;
 
             return this;
         }
@@ -418,11 +468,20 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
             if (this.handleRef == null) {
                 throw new IllegalStateException("handleRef is required");
             }
+            final RefreshBehavior behavior = this.refreshBehavior == null ? RefreshBehavior.KEEP : this.refreshBehavior;
             if (this.mask != null) {
-                final PaginatedContainerViewComponent<T> component = this.refreshBehavior == null
-                    ? new PaginatedContainerViewComponent<>(this.key, this.loader, this.renderer, this.clickMapper, this.handleRef, this.loaderExecutor, this.mask)
-                    : new PaginatedContainerViewComponent<>(this.key, this.loader, this.renderer, this.clickMapper, this.handleRef, this.loaderExecutor, this.refreshBehavior, this.mask);
-
+                final PaginatedContainerViewComponent<T> component = new PaginatedContainerViewComponent<>(
+                    this.key,
+                    this.loader,
+                    this.renderer,
+                    this.clickMapper,
+                    this.handleRef,
+                    this.loaderExecutor,
+                    this.renderExecutor,
+                    behavior,
+                    this.useSuspendedRenderables,
+                    this.mask.clone()
+                );
                 for (final var entry : this.componentMappings.entrySet()) {
                     final char ch = entry.getKey();
 
@@ -433,10 +492,19 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
                 return component;
             }
             if (this.width != null && this.height != null) {
-                final PaginatedContainerViewComponent<T> component = this.refreshBehavior == null
-                    ? new PaginatedContainerViewComponent<>(this.key, this.width, this.height, this.loader, this.renderer, this.clickMapper, this.handleRef, this.loaderExecutor)
-                    : new PaginatedContainerViewComponent<>(this.key, this.width, this.height, this.loader, this.renderer, this.clickMapper, this.handleRef, this.loaderExecutor, this.refreshBehavior);
-
+                final String[] rectMask = createRectMask(this.width, this.height);
+                final PaginatedContainerViewComponent<T> component = new PaginatedContainerViewComponent<>(
+                    this.key,
+                    this.loader,
+                    this.renderer,
+                    this.clickMapper,
+                    this.handleRef,
+                    this.loaderExecutor,
+                    this.renderExecutor,
+                    behavior,
+                    this.useSuspendedRenderables,
+                    rectMask
+                );
                 for (final var entry : this.componentMappings.entrySet()) {
                     final char ch = entry.getKey();
 
@@ -514,6 +582,21 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
         private @NotNull Builder<T> map(final char ch, @NotNull final SlotConfigurer<Player, ClickContext> configurer) {
             this.componentMappings.computeIfAbsent(ch, k -> new java.util.ArrayList<>()).add(configurer);
             return this;
+        }
+
+        private static @NotNull String[] createRectMask(final int width, final int height) {
+            if (width <= 0 || height <= 0) {
+                throw new IllegalArgumentException("width and height must be positive");
+            }
+            final String[] mask = new String[height];
+            final char[] row = new char[width];
+
+            java.util.Arrays.fill(row, '#');
+            final String rowString = new String(row);
+
+            java.util.Arrays.fill(mask, rowString);
+
+            return mask;
         }
     }
 }
