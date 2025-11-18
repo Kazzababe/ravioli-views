@@ -8,12 +8,20 @@ plugins {
     `maven-publish`
 }
 
+val adapters by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+
 repositories {
     maven("https://repo.papermc.io/repository/maven-public/")
 }
 
 dependencies {
     api(projects.core)
+
+    adapters(projects.paper.v120)
+    adapters(projects.paper.v121)
 
     paperweight.paperDevBundle(rootProject.libs.versions.paper.get())
 }
@@ -25,6 +33,18 @@ tasks {
 
     reobfJar {
         outputJar.set(file("${layout.buildDirectory.path.absolutePathString()}/libs/${project.name}-${project.version}.jar"))
+    }
+
+    shadowJar {
+        dependsOn(adapters)
+
+        from(adapters.resolve().map { file ->
+            if (file.isDirectory) {
+                file
+            } else {
+                zipTree(file)
+            }
+        })
     }
 }
 

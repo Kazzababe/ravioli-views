@@ -1,12 +1,13 @@
 package dev.mckelle.gui.paper.util;
 
+import dev.mckelle.gui.paper.compat.InventoryViewAdapter;
+import dev.mckelle.gui.paper.compat.InventoryViewAdapterFactory;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -31,6 +32,8 @@ import java.util.Map;
  */
 public final class InventoryUtils {
 
+    private static final InventoryViewAdapter ADAPTER = InventoryViewAdapterFactory.get();
+
     private InventoryUtils() {
     }
 
@@ -49,7 +52,7 @@ public final class InventoryUtils {
      * @return A map of slot index to the predicted ItemStack for every slot in the top inventory.
      */
     public static @NotNull Map<Integer, ItemStack> predictTopInventoryChanges(@NotNull final InventoryClickEvent event) {
-        final Inventory topInventory = event.getView().getTopInventory();
+        final Inventory topInventory = ADAPTER.getTopInventory(event);
         final Map<Integer, ItemStack> predictedState = new HashMap<>();
 
         for (int i = 0; i < topInventory.getSize(); i++) {
@@ -111,7 +114,7 @@ public final class InventoryUtils {
                 if (spaceLeft <= 0) {
                     break;
                 }
-                for (int i = 0; i < event.getView().countSlots(); i++) {
+                for (int i = 0; i < ADAPTER.countSlots(event); i++) {
                     if (spaceLeft <= 0) {
                         break;
                     }
@@ -311,16 +314,16 @@ public final class InventoryUtils {
         if (originalItem == null) {
             return null;
         }
-        final InventoryView view = event.getView();
         final Inventory clickedInventory = event.getClickedInventory();
 
         if (clickedInventory == null) {
             return originalItem; // Should not happen with this action
         }
         // Determine destination inventory
-        final Inventory destinationInventory = clickedInventory.equals(view.getTopInventory())
-            ? view.getBottomInventory()
-            : view.getTopInventory();
+        final Inventory topInventory = ADAPTER.getTopInventory(event);
+        final Inventory destinationInventory = clickedInventory.equals(topInventory)
+            ? ADAPTER.getBottomInventory(event)
+            : topInventory;
         final ItemStack[] storageContents = destinationInventory.getStorageContents();
         final int inventorySize = storageContents.length;
         final Inventory simulatedInventory = Bukkit.createInventory(null, inventorySize, "simulated");
@@ -351,7 +354,6 @@ public final class InventoryUtils {
         if (cursorItem == null || currentItem == null || !currentItem.isSimilar(cursorItem)) {
             return currentItem; // Action is impossible, no change
         }
-        final InventoryView view = event.getView();
         int spaceLeftOnCursor = cursorItem.getMaxStackSize() - cursorItem.getAmount();
 
         if (spaceLeftOnCursor <= 0) {
@@ -359,7 +361,7 @@ public final class InventoryUtils {
         }
         // Iterate through all slots to see what would be collected before this slot.
         // The iteration order is top inventory, then bottom inventory.
-        for (int i = 0; i < view.countSlots(); i++) {
+        for (int i = 0; i < ADAPTER.countSlots(event); i++) {
             if (spaceLeftOnCursor <= 0) {
                 break; // Cursor is now full
             }
@@ -367,7 +369,7 @@ public final class InventoryUtils {
             if (i == event.getRawSlot()) {
                 break;
             }
-            final ItemStack slotItem = view.getItem(i);
+            final ItemStack slotItem = ADAPTER.getItem(event, i);
 
             if (slotItem != null && slotItem.isSimilar(cursorItem)) {
                 final int amountToTake = Math.min(spaceLeftOnCursor, slotItem.getAmount());

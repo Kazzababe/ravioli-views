@@ -9,6 +9,8 @@ import dev.mckelle.gui.api.state.State;
 import dev.mckelle.gui.api.state.effect.Effect;
 import dev.mckelle.gui.core.ViewReconciler;
 import dev.mckelle.gui.core.ViewRegistry;
+import dev.mckelle.gui.paper.compat.InventoryViewAdapter;
+import dev.mckelle.gui.paper.compat.InventoryViewAdapterFactory;
 import dev.mckelle.gui.paper.component.container.VirtualContainerViewComponent;
 import dev.mckelle.gui.paper.context.ClickContext;
 import dev.mckelle.gui.paper.context.CloseContext;
@@ -59,6 +61,7 @@ public final class ViewManager {
     private final Plugin plugin;
     private final ViewRegistry viewRegistry;
     private final Scheduler scheduler;
+    private final InventoryViewAdapter inventoryViewAdapter;
 
     private final Map<UUID, PlayerViewSession<?>> sessions = new HashMap<>();
     private final boolean reuseInventoryWhenPossible;
@@ -85,6 +88,7 @@ public final class ViewManager {
         this.reuseInventoryWhenPossible = reuseInventoryWhenPossible;
         this.viewRegistry = new ViewRegistry();
         this.scheduler = new PaperScheduler(plugin);
+        this.inventoryViewAdapter = InventoryViewAdapterFactory.get();
     }
 
     /**
@@ -397,7 +401,7 @@ public final class ViewManager {
             }
             final PlayerViewSession<?> playerSession = ViewManager.this.sessions.get(player.getUniqueId());
 
-            if (playerSession == null || event.getView().getTopInventory() != playerSession.session.inventory()) {
+            if (playerSession == null || ViewManager.this.inventoryViewAdapter.getTopInventory(event) != playerSession.session.inventory()) {
                 return;
             }
             final long now = System.currentTimeMillis();
@@ -640,7 +644,7 @@ public final class ViewManager {
             if (session == null) {
                 return;
             }
-            final Inventory topInventory = event.getView().getTopInventory();
+            final Inventory topInventory = ViewManager.this.inventoryViewAdapter.getTopInventory(event);
 
             if (topInventory != session.session.inventory()) {
                 return;

@@ -138,6 +138,7 @@ public final class PaperInventoryRenderer<D> extends AbstractInventoryRenderer<P
             this.session.inventory().setItem(slot, itemStack);
         } else {
             currentItem.setItemMeta(itemStack.getItemMeta());
+            currentItem.setAmount(itemStack.getAmount());
         }
     }
 

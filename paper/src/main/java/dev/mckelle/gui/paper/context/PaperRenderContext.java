@@ -8,11 +8,12 @@ import dev.mckelle.gui.api.state.State;
 import dev.mckelle.gui.api.state.effect.Effect;
 import dev.mckelle.gui.core.RootRenderContext;
 import dev.mckelle.gui.paper.ViewSession;
+import dev.mckelle.gui.paper.compat.InventoryViewAdapter;
+import dev.mckelle.gui.paper.compat.InventoryViewAdapterFactory;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryView;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -31,6 +32,8 @@ import java.util.Set;
  * @param <D> The type of the properties (props) for the view.
  */
 public class PaperRenderContext<D> extends RootRenderContext<Player, D, ClickContext> implements RenderContext<D> {
+    private static final InventoryViewAdapter ADAPTER = InventoryViewAdapterFactory.get();
+    
     private final Inventory inventory;
 
     /**
@@ -115,12 +118,12 @@ public class PaperRenderContext<D> extends RootRenderContext<Player, D, ClickCon
     @SuppressWarnings("deprecation")
     @Override
     public void updateTitle(@NotNull final String title) {
-        final InventoryView inventoryView = this.getViewer().getOpenInventory();
+        final Inventory openTopInventory = ADAPTER.getOpenTopInventory(this.getViewer());
 
-        if (!Objects.equals(inventoryView.getTopInventory(), this.inventory)) {
+        if (!Objects.equals(openTopInventory, this.inventory)) {
             return;
         }
-        inventoryView.setTitle(title);
+        ADAPTER.setOpenInventoryTitle(this.getViewer(), title);
     }
 
     /**
