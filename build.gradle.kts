@@ -10,7 +10,7 @@ plugins {
 
 allprojects {
     group = "dev.mckelle"
-    version = "1.1.19"
+    version = "1.1.21"
 }
 
 val projectName = "Ravioli Views"

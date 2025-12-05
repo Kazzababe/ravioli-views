@@ -169,14 +169,20 @@ public final class ViewManager {
         @NotNull final Player player,
         @Nullable final D props
     ) {
+        if (!Bukkit.isPrimaryThread()) {
+            Bukkit.getScheduler().runTask(this.plugin, () -> this.openView(viewClass, player, props));
+
+            return;
+        }
         final var view = this.viewRegistry.getView(viewClass);
 
         if (view == null) {
             throw new IllegalArgumentException("Unknown view class " + viewClass.getName());
         }
         final InitContext<D> init = new InitContext<>(player, props);
-
-        view.init(init);
+        @SuppressWarnings("unchecked") final View<D> standardView = (View<D>) view;
+        
+        standardView.init(init);
 
         final InventoryType requestedType = init.getType();
         final int width;
@@ -221,14 +227,14 @@ public final class ViewManager {
                 existingSession.renderer().unmount(existingSession);
                 existing.reconciler.cleanup();
 
-                final ViewSession<D> session = renderer.remount(view, props);
+                final ViewSession<D> session = renderer.remount(standardView, props);
 
                 // Update title without closing the inventory
                 final Component title = init.getTitle();
                 final String titleString = LegacyComponentSerializer.legacySection().serialize(title);
 
                 //noinspection deprecation
-                player.getOpenInventory().setTitle(titleString);
+                this.inventoryViewAdapter.setOpenInventoryTitle(player, titleString);
 
                 final ViewReconciler<Player> reconciler = new ViewReconciler<>(
                     new IRenderContext.RenderContextCreator<Player, D, ClickContext, IRenderContext<Player, D, ClickContext>>() {
@@ -244,43 +250,7 @@ public final class ViewManager {
                         ) {
                             return new PaperRenderContext<>(
                                 props,
-                                new Scheduler() {
-                                    @Override
-                                    public @NotNull TaskHandle run(@NotNull final Runnable task) {
-                                        final TaskHandle handle = ViewManager.this.scheduler.run(task);
-
-                                        session.attachSchedulerTask(handle);
-
-                                        return () -> {
-                                            handle.cancel();
-                                            session.detachSchedulerTask(handle);
-                                        };
-                                    }
-
-                                    @Override
-                                    public @NotNull TaskHandle runLater(@NotNull final Runnable task, @NotNull final Duration delay) {
-                                        final TaskHandle handle = ViewManager.this.scheduler.runLater(task, delay);
-
-                                        session.attachSchedulerTask(handle);
-
-                                        return () -> {
-                                            handle.cancel();
-                                            session.detachSchedulerTask(handle);
-                                        };
-                                    }
-
-                                    @Override
-                                    public @NotNull TaskHandle runRepeating(@NotNull final Runnable task, @NotNull final Duration interval) {
-                                        final TaskHandle handle = ViewManager.this.scheduler.runRepeating(task, interval);
-
-                                        session.attachSchedulerTask(handle);
-
-                                        return () -> {
-                                            handle.cancel();
-                                            session.detachSchedulerTask(handle);
-                                        };
-                                    }
-                                },
+                                ViewManager.this.createScheduler(session),
                                 session,
                                 renderables,
                                 clicks,
@@ -301,12 +271,11 @@ public final class ViewManager {
 
                 reconciler.render();
                 this.sessions.put(player.getUniqueId(), new PlayerViewSession<D>(session, reconciler, new AtomicLong(0)));
-
                 return;
             }
         }
         final PaperInventoryRenderer<D> renderer = new PaperInventoryRenderer<>(requestedType);
-        final ViewSession<D> session = renderer.mount(view, props, player, init.getTitle(), slots);
+        final ViewSession<D> session = renderer.mount(standardView, props, player, init.getTitle(), slots);
         final ViewReconciler<Player> reconciler = new ViewReconciler<>(
             new IRenderContext.RenderContextCreator<Player, D, ClickContext, IRenderContext<Player, D, ClickContext>>() {
                 @Override
@@ -321,46 +290,7 @@ public final class ViewManager {
                 ) {
                     return new PaperRenderContext<>(
                         props,
-                        new Scheduler() {
-                            @Override
-                            public @NotNull TaskHandle run(@NotNull final Runnable task) {
-                                final TaskHandle handle = ViewManager.this.scheduler.run(task);
-
-                                session.attachSchedulerTask(handle);
-
-                                return () -> {
-                                    handle.cancel();
-
-                                    session.detachSchedulerTask(handle);
-                                };
-                            }
-
-                            @Override
-                            public @NotNull TaskHandle runLater(@NotNull final Runnable task, @NotNull final Duration delay) {
-                                final TaskHandle handle = ViewManager.this.scheduler.runLater(task, delay);
-
-                                session.attachSchedulerTask(handle);
-
-                                return () -> {
-                                    handle.cancel();
-
-                                    session.detachSchedulerTask(handle);
-                                };
-                            }
-
-                            @Override
-                            public @NotNull TaskHandle runRepeating(@NotNull final Runnable task, @NotNull final Duration interval) {
-                                final TaskHandle handle = ViewManager.this.scheduler.runRepeating(task, interval);
-
-                                session.attachSchedulerTask(handle);
-
-                                return () -> {
-                                    handle.cancel();
-
-                                    session.detachSchedulerTask(handle);
-                                };
-                            }
-                        },
+                        ViewManager.this.createScheduler(session),
                         session,
                         renderables,
                         clicks,
@@ -370,8 +300,8 @@ public final class ViewManager {
                         visited,
                         requestUpdateFn,
                         session.inventory(),
-                        width,
-                        height
+                        9,
+                        session.inventory().getSize() / 9
                     );
                 }
             },
@@ -381,6 +311,46 @@ public final class ViewManager {
 
         reconciler.render();
         this.sessions.put(player.getUniqueId(), new PlayerViewSession<D>(session, reconciler, new AtomicLong(0)));
+    }
+
+    private @NotNull Scheduler createScheduler(@NotNull final ViewSession<?> session) {
+        return new Scheduler() {
+            @Override
+            public @NotNull TaskHandle run(@NotNull final Runnable task) {
+                final TaskHandle handle = ViewManager.this.scheduler.run(task);
+
+                session.attachSchedulerTask(handle);
+
+                return () -> {
+                    handle.cancel();
+                    session.detachSchedulerTask(handle);
+                };
+            }
+
+            @Override
+            public @NotNull TaskHandle runLater(@NotNull final Runnable task, @NotNull final Duration delay) {
+                final TaskHandle handle = ViewManager.this.scheduler.runLater(task, delay);
+
+                session.attachSchedulerTask(handle);
+
+                return () -> {
+                    handle.cancel();
+                    session.detachSchedulerTask(handle);
+                };
+            }
+
+            @Override
+            public @NotNull TaskHandle runRepeating(@NotNull final Runnable task, @NotNull final Duration interval) {
+                final TaskHandle handle = ViewManager.this.scheduler.runRepeating(task, interval);
+
+                session.attachSchedulerTask(handle);
+
+                return () -> {
+                    handle.cancel();
+                    session.detachSchedulerTask(handle);
+                };
+            }
+        };
     }
 
     /**

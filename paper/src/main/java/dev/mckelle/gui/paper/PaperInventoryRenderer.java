@@ -67,15 +67,16 @@ public final class PaperInventoryRenderer<D> extends AbstractInventoryRenderer<P
         final Component componentTitle = title instanceof final Component component
             ? component :
             Component.text(title.toString());
+        final ViewInventoryHolder holder = new ViewInventoryHolder();
 
         if (this.inventoryType == InventoryType.CHEST) {
-            inventory = Bukkit.createInventory(new ViewInventoryHolder(), size, componentTitle);
+            inventory = Bukkit.createInventory(holder, size, componentTitle);
         } else {
-            inventory = Bukkit.createInventory(new ViewInventoryHolder(), this.inventoryType, componentTitle);
+            inventory = Bukkit.createInventory(holder, this.inventoryType, componentTitle);
         }
         this.session = new ViewSession<>(rootView, props, viewer, inventory, this);
 
-        ((ViewInventoryHolder) inventory.getHolder()).setSession(this.session);
+        holder.setSession(this.session);
         viewer.openInventory(inventory);
 
         return this.session;

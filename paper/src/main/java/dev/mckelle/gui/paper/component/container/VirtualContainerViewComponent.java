@@ -5,6 +5,8 @@ import dev.mckelle.gui.api.component.ViewComponentBase;
 import dev.mckelle.gui.api.context.IRenderContext;
 import dev.mckelle.gui.api.render.ViewRenderable;
 import dev.mckelle.gui.api.state.Ref;
+import dev.mckelle.gui.paper.compat.InventoryViewAdapter;
+import dev.mckelle.gui.paper.compat.InventoryViewAdapterFactory;
 import dev.mckelle.gui.paper.component.ViewComponent;
 import dev.mckelle.gui.paper.context.RenderContext;
 import org.bukkit.entity.Player;
@@ -37,6 +39,8 @@ import java.util.function.Predicate;
  * }</pre>
  */
 public final class VirtualContainerViewComponent extends ViewComponent<Void> {
+    private static final InventoryViewAdapter ADAPTER = InventoryViewAdapterFactory.get();
+    
     /**
      * An imperative handle for interacting with the contents of a {@link VirtualContainerViewComponent}
      * after it has been rendered.
@@ -273,7 +277,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
          * @param context The render context from which to derive the inventory and origin coordinates.
          */
         private ImperativeHandle(@NotNull final IRenderContext<Player, ?, ?> context) {
-            this.inventory = context.getViewer().getOpenInventory().getTopInventory();
+            this.inventory = ADAPTER.getOpenTopInventory(context.getViewer());
             this.originX = context.getOriginX();
             this.originY = context.getOriginY();
             this.viewWidth = context.getViewWidth();

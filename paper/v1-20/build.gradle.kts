@@ -1,5 +1,6 @@
 plugins {
     `java-library`
+    id("io.papermc.paperweight.userdev")
 }
 
 repositories {
@@ -8,6 +9,6 @@ repositories {
 
 dependencies {
     compileOnly(projects.paper)
-    compileOnly("io.papermc.paper:paper-api:1.20.4-R0.1-SNAPSHOT")
+    paperweight.paperDevBundle("1.20.4-R0.1-SNAPSHOT")
 }
 
