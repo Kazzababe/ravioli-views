@@ -4,6 +4,7 @@ import dev.mckelle.gui.paper.compat.InventoryViewAdapter;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
@@ -25,27 +26,22 @@ public final class InventoryViewAdapter_1_21 implements InventoryViewAdapter {
     }
 
     @Override
-    public @NotNull Inventory getTopInventory(@NotNull final InventoryClickEvent event) {
+    public @NotNull Inventory getTopInventory(@NotNull final InventoryEvent event) {
         return event.getView().getTopInventory();
     }
 
     @Override
-    public @NotNull Inventory getTopInventory(@NotNull final InventoryDragEvent event) {
-        return event.getView().getTopInventory();
-    }
-
-    @Override
-    public @NotNull Inventory getBottomInventory(@NotNull final InventoryClickEvent event) {
+    public @NotNull Inventory getBottomInventory(@NotNull final InventoryEvent event) {
         return event.getView().getBottomInventory();
     }
 
     @Override
-    public int countSlots(@NotNull final InventoryClickEvent event) {
+    public int countSlots(@NotNull final InventoryEvent event) {
         return event.getView().countSlots();
     }
 
     @Override
-    public @Nullable ItemStack getItem(@NotNull final InventoryClickEvent event, final int slot) {
+    public @Nullable ItemStack getItem(@NotNull final InventoryEvent event, final int slot) {
         final InventoryView view = event.getView();
         return view.getItem(slot);
     }

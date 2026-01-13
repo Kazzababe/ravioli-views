@@ -3,6 +3,7 @@ package dev.mckelle.gui.paper.compat;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
@@ -19,45 +20,37 @@ import org.jetbrains.annotations.Nullable;
 public interface InventoryViewAdapter {
 
     /**
-     * Gets the top inventory from an InventoryClickEvent.
-     *
-     * @param event The inventory click event
-     * @return The top inventory
-     */
-    @NotNull Inventory getTopInventory(@NotNull InventoryClickEvent event);
-
-    /**
      * Gets the top inventory from an InventoryDragEvent.
      *
-     * @param event The inventory drag event
+     * @param event The inventory event
      * @return The top inventory
      */
-    @NotNull Inventory getTopInventory(@NotNull InventoryDragEvent event);
+    @NotNull Inventory getTopInventory(@NotNull InventoryEvent event);
 
     /**
      * Gets the bottom inventory from an InventoryClickEvent.
      *
-     * @param event The inventory click event
+     * @param event The inventory event
      * @return The bottom inventory
      */
-    @NotNull Inventory getBottomInventory(@NotNull InventoryClickEvent event);
+    @NotNull Inventory getBottomInventory(@NotNull InventoryEvent event);
 
     /**
      * Counts the total number of slots in the view.
      *
-     * @param event The inventory click event
+     * @param event The inventory event
      * @return The total slot count
      */
-    int countSlots(@NotNull InventoryClickEvent event);
+    int countSlots(@NotNull InventoryEvent event);
 
     /**
      * Gets the item at a specific slot in the view.
      *
-     * @param event The inventory click event
+     * @param event The inventory event
      * @param slot  The slot index
      * @return The item at the slot, or null if empty
      */
-    @Nullable ItemStack getItem(@NotNull InventoryClickEvent event, int slot);
+    @Nullable ItemStack getItem(@NotNull InventoryEvent event, int slot);
 
     /**
      * Gets the top inventory from a player's open inventory view.

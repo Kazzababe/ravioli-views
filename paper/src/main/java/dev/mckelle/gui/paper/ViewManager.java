@@ -17,6 +17,7 @@ import dev.mckelle.gui.paper.context.CloseContext;
 import dev.mckelle.gui.paper.context.InitContext;
 import dev.mckelle.gui.paper.context.PaperRenderContext;
 import dev.mckelle.gui.paper.schedule.PaperScheduler;
+import dev.mckelle.gui.paper.util.InventorySnapshot;
 import dev.mckelle.gui.paper.util.InventoryUtils;
 import dev.mckelle.gui.paper.view.View;
 import net.kyori.adventure.text.Component;
@@ -181,7 +182,7 @@ public final class ViewManager {
         }
         final InitContext<D> init = new InitContext<>(player, props);
         @SuppressWarnings("unchecked") final View<D> standardView = (View<D>) view;
-        
+
         standardView.init(init);
 
         final InventoryType requestedType = init.getType();
@@ -236,6 +237,8 @@ public final class ViewManager {
                 //noinspection deprecation
                 this.inventoryViewAdapter.setOpenInventoryTitle(player, titleString);
 
+                // Use a ref for the reconciler so the scheduler can access it during render
+                final Ref<ViewReconciler<Player>> reconcilerRef = new Ref<>(null);
                 final ViewReconciler<Player> reconciler = new ViewReconciler<>(
                     new IRenderContext.RenderContextCreator<Player, D, ClickContext, IRenderContext<Player, D, ClickContext>>() {
                         @Override
@@ -250,7 +253,7 @@ public final class ViewManager {
                         ) {
                             return new PaperRenderContext<>(
                                 props,
-                                ViewManager.this.createScheduler(session),
+                                ViewManager.this.createScheduler(session, reconcilerRef),
                                 session,
                                 renderables,
                                 clicks,
@@ -269,6 +272,7 @@ public final class ViewManager {
                     renderer
                 );
 
+                reconcilerRef.set(reconciler);
                 reconciler.render();
                 this.sessions.put(player.getUniqueId(), new PlayerViewSession<D>(session, reconciler, new AtomicLong(0)));
                 return;
@@ -276,6 +280,9 @@ public final class ViewManager {
         }
         final PaperInventoryRenderer<D> renderer = new PaperInventoryRenderer<>(requestedType);
         final ViewSession<D> session = renderer.mount(standardView, props, player, init.getTitle(), slots);
+
+        // Use a ref for the reconciler so the scheduler can access it during render
+        final Ref<ViewReconciler<Player>> reconcilerRef = new Ref<>(null);
         final ViewReconciler<Player> reconciler = new ViewReconciler<>(
             new IRenderContext.RenderContextCreator<Player, D, ClickContext, IRenderContext<Player, D, ClickContext>>() {
                 @Override
@@ -290,7 +297,7 @@ public final class ViewManager {
                 ) {
                     return new PaperRenderContext<>(
                         props,
-                        ViewManager.this.createScheduler(session),
+                        ViewManager.this.createScheduler(session, reconcilerRef),
                         session,
                         renderables,
                         clicks,
@@ -309,15 +316,27 @@ public final class ViewManager {
             renderer
         );
 
+        reconcilerRef.set(reconciler);
         reconciler.render();
         this.sessions.put(player.getUniqueId(), new PlayerViewSession<D>(session, reconciler, new AtomicLong(0)));
     }
 
-    private @NotNull Scheduler createScheduler(@NotNull final ViewSession<?> session) {
+    private @NotNull Scheduler createScheduler(
+        @NotNull final ViewSession<?> session,
+        @NotNull final Ref<ViewReconciler<Player>> reconcilerRef
+    ) {
         return new Scheduler() {
             @Override
             public @NotNull TaskHandle run(@NotNull final Runnable task) {
-                final TaskHandle handle = ViewManager.this.scheduler.run(task);
+                final TaskHandle handle = ViewManager.this.scheduler.run(() -> {
+                    final ViewReconciler<Player> reconciler = reconcilerRef.get();
+
+                    if (reconciler != null) {
+                        reconciler.batch(task);
+                    } else {
+                        task.run();
+                    }
+                });
 
                 session.attachSchedulerTask(handle);
 
@@ -329,7 +348,15 @@ public final class ViewManager {
 
             @Override
             public @NotNull TaskHandle runLater(@NotNull final Runnable task, @NotNull final Duration delay) {
-                final TaskHandle handle = ViewManager.this.scheduler.runLater(task, delay);
+                final TaskHandle handle = ViewManager.this.scheduler.runLater(() -> {
+                    final ViewReconciler<Player> reconciler = reconcilerRef.get();
+
+                    if (reconciler != null) {
+                        reconciler.batch(task);
+                    } else {
+                        task.run();
+                    }
+                }, delay);
 
                 session.attachSchedulerTask(handle);
 
@@ -341,7 +368,15 @@ public final class ViewManager {
 
             @Override
             public @NotNull TaskHandle runRepeating(@NotNull final Runnable task, @NotNull final Duration interval) {
-                final TaskHandle handle = ViewManager.this.scheduler.runRepeating(task, interval);
+                final TaskHandle handle = ViewManager.this.scheduler.runRepeating(() -> {
+                    final ViewReconciler<Player> reconciler = reconcilerRef.get();
+
+                    if (reconciler != null) {
+                        reconciler.batch(task);
+                    } else {
+                        task.run();
+                    }
+                }, interval);
 
                 session.attachSchedulerTask(handle);
 
@@ -396,88 +431,119 @@ public final class ViewManager {
                 if (originalItem == null || originalItem.isEmpty()) {
                     return;
                 }
-                final ItemStack itemToMove = originalItem.clone();
-                VirtualContainerViewComponent.EditableSlot containerProps = null;
-
-                for (final ViewRenderable renderable : playerSession.session.renderer().renderables().values()) {
-                    if (renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot) {
-                        containerProps = editableSlot;
-
-                        break;
-                    }
-                }
                 event.setCancelled(true);
 
-                if (containerProps != null) {
-                    if (!containerProps.filter().test(itemToMove)) {
-                        return; // rejected by container-wide filter
-                    }
-                    final Consumer<VirtualContainerViewComponent.ChangeEvent> onChange = containerProps.onChange();
+                final ItemStack itemToMove = originalItem.clone();
+                final InventorySnapshot snapshot = new InventorySnapshot(topInventory);
 
-                    // Merge into existing stacks first
+                // Track changes to fire onChange after all mutations, grouped by EditableSlot
+                final Map<Integer, ItemStack> oldItems = new HashMap<>();
+                final Map<Integer, ItemStack> newItems = new HashMap<>();
+                final Map<Integer, VirtualContainerViewComponent.EditableSlot> affectedSlots = new HashMap<>();
+
+                // Merge into existing stacks first
+                for (int slotIndex = 0; slotIndex < topInventory.getSize(); slotIndex++) {
+                    if (itemToMove.getAmount() <= 0) {
+                        break;
+                    }
+                    final var possibleSlot = playerSession.session.renderer().renderables().get(slotIndex);
+
+                    if (!(possibleSlot instanceof final VirtualContainerViewComponent.EditableSlot editableSlot)) {
+                        continue;
+                    }
+                    // Check this specific slot's filter
+                    if (!editableSlot.filter().test(itemToMove)) {
+                        continue;
+                    }
+                    final ItemStack existingItem = topInventory.getItem(slotIndex);
+
+                    if (existingItem == null || existingItem.isEmpty() || !existingItem.isSimilar(itemToMove)) {
+                        continue;
+                    }
+                    final int space = existingItem.getMaxStackSize() - existingItem.getAmount();
+
+                    if (space <= 0) {
+                        continue;
+                    }
+                    final int amountToTransfer = Math.min(space, itemToMove.getAmount());
+                    final ItemStack oldItemState = existingItem.clone();
+
+                    existingItem.setAmount(existingItem.getAmount() + amountToTransfer);
+                    itemToMove.setAmount(itemToMove.getAmount() - amountToTransfer);
+
+                    // Track the change
+                    oldItems.put(slotIndex, oldItemState);
+                    newItems.put(slotIndex, existingItem.clone());
+                    affectedSlots.put(slotIndex, editableSlot);
+
+                    // Update the snapshot to reflect the new state
+                    snapshot.setItemSilently(slotIndex, existingItem.clone());
+                }
+                // Fill empty editable slots next
+                if (itemToMove.getAmount() > 0) {
                     for (int slotIndex = 0; slotIndex < topInventory.getSize(); slotIndex++) {
                         if (itemToMove.getAmount() <= 0) {
                             break;
                         }
                         final var possibleSlot = playerSession.session.renderer().renderables().get(slotIndex);
 
-                        if (!(possibleSlot instanceof VirtualContainerViewComponent.EditableSlot)) {
+                        if (!(possibleSlot instanceof final VirtualContainerViewComponent.EditableSlot editableSlot)) {
                             continue;
                         }
-                        final ItemStack existingItem = topInventory.getItem(slotIndex);
-
-                        if (existingItem == null || existingItem.isEmpty() || !existingItem.isSimilar(itemToMove)) {
+                        // Check this specific slot's filter
+                        if (!editableSlot.filter().test(itemToMove)) {
                             continue;
                         }
-                        final int space = existingItem.getMaxStackSize() - existingItem.getAmount();
+                        final ItemStack currentTopItem = topInventory.getItem(slotIndex);
 
-                        if (space <= 0) {
+                        if (currentTopItem != null && !currentTopItem.isEmpty()) {
                             continue;
                         }
-                        final int amountToTransfer = Math.min(space, itemToMove.getAmount());
-                        final ItemStack oldItemState = existingItem.clone();
+                        final int amountToTransfer = Math.min(itemToMove.getMaxStackSize(), itemToMove.getAmount());
+                        final ItemStack newItem = itemToMove.clone();
 
-                        existingItem.setAmount(existingItem.getAmount() + amountToTransfer);
+                        newItem.setAmount(amountToTransfer);
+                        topInventory.setItem(slotIndex, newItem);
                         itemToMove.setAmount(itemToMove.getAmount() - amountToTransfer);
 
-                        if (onChange != null) {
-                            onChange.accept(new VirtualContainerViewComponent.ChangeEvent(
-                                player, slotIndex, oldItemState, existingItem.clone()
-                            ));
+                        if (itemToMove.isEmpty()) {
+                            clickedInventory.setItem(event.getSlot(), null);
                         }
+
+                        // Track the change
+                        oldItems.put(slotIndex, null);
+                        newItems.put(slotIndex, newItem.clone());
+                        affectedSlots.put(slotIndex, editableSlot);
+
+                        // Update the snapshot to reflect the new state
+                        snapshot.setItemSilently(slotIndex, newItem.clone());
                     }
-                    // Fill empty editable slots next
-                    if (itemToMove.getAmount() > 0) {
-                        for (int slotIndex = 0; slotIndex < topInventory.getSize(); slotIndex++) {
-                            if (itemToMove.getAmount() <= 0) {
-                                break;
-                            }
-                            final var possibleSlot = playerSession.session.renderer().renderables().get(slotIndex);
-
-                            if (!(possibleSlot instanceof VirtualContainerViewComponent.EditableSlot)) {
-                                continue;
-                            }
-                            final ItemStack currentTopItem = topInventory.getItem(slotIndex);
-
-                            if (currentTopItem != null && !currentTopItem.isEmpty()) {
-                                continue;
-                            }
-                            final int amountToTransfer = Math.min(itemToMove.getMaxStackSize(), itemToMove.getAmount());
-                            final ItemStack newItem = itemToMove.clone();
-
-                            newItem.setAmount(amountToTransfer);
-                            topInventory.setItem(slotIndex, newItem);
-                            itemToMove.setAmount(itemToMove.getAmount() - amountToTransfer);
-
-                            if (onChange != null) {
-                                onChange.accept(new VirtualContainerViewComponent.ChangeEvent(
-                                    player, slotIndex, null, newItem.clone()
-                                ));
-                            }
-                        }
-                    }
-                    clickedInventory.setItem(event.getSlot(), itemToMove.getAmount() > 0 ? itemToMove : null);
                 }
+
+                // Now fire onChange for all affected slots with the fully-updated snapshot
+                // Wrap in batch to coalesce any state changes made during callbacks
+                playerSession.reconciler.batch(() -> {
+                    for (final int slotIndex : newItems.keySet()) {
+                        final VirtualContainerViewComponent.EditableSlot editableSlot = affectedSlots.get(slotIndex);
+                        final var onChange = editableSlot.onChange();
+
+                        if (onChange == null) {
+                            continue;
+                        }
+                        onChange.accept(
+                            new VirtualContainerViewComponent.ChangeEvent(
+                                player,
+                                slotIndex,
+                                oldItems.get(slotIndex),
+                                newItems.get(slotIndex),
+                                snapshot,
+                                new VirtualContainerViewComponent.SnapshotHandleImpl(editableSlot.handleRef().get(), snapshot)
+                            )
+                        );
+                    }
+                });
+                snapshot.reconcile();
+
                 return;
             }
             if (clickedInventory != topInventory) {
@@ -508,21 +574,35 @@ public final class ViewManager {
                         return;
                     }
                 }
-                for (final Map.Entry<Integer, ItemStack> entry : afterState.entrySet()) {
-                    final int slotIndex = entry.getKey();
+                final InventorySnapshot snapshot = new InventorySnapshot(topInventory);
 
-                    if (Objects.equals(beforeState.get(slotIndex), entry.getValue())) {
-                        continue;
-                    }
-                    final ViewRenderable renderable = playerSession.session.renderer().renderables().get(slotIndex);
+                // Wrap onChange callbacks in batch to coalesce state changes
+                playerSession.reconciler.batch(() -> {
+                    for (final Map.Entry<Integer, ItemStack> entry : afterState.entrySet()) {
+                        final int slotIndex = entry.getKey();
 
-                    if (renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot
-                        && editableSlot.onChange() != null) {
-                        editableSlot.onChange().accept(new VirtualContainerViewComponent.ChangeEvent(
-                            player, slotIndex, beforeState.get(slotIndex), entry.getValue()
-                        ));
+                        if (Objects.equals(beforeState.get(slotIndex), entry.getValue())) {
+                            continue;
+                        }
+                        final ViewRenderable renderable = playerSession.session.renderer().renderables().get(slotIndex);
+
+                        if (renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot
+                            && editableSlot.onChange() != null) {
+                            editableSlot.onChange().accept(
+                                new VirtualContainerViewComponent.ChangeEvent(
+                                    player,
+                                    slotIndex,
+                                    beforeState.get(slotIndex),
+                                    entry.getValue(),
+                                    snapshot,
+                                    new VirtualContainerViewComponent.SnapshotHandleImpl(editableSlot.handleRef().get(), snapshot)
+                                )
+                            );
+                        }
                     }
-                }
+                });
+                snapshot.reconcile();
+
                 return;
             }
             // Clicked in top inventory
@@ -573,17 +653,43 @@ public final class ViewManager {
                     beforeState.put(i, InventoryUtils.cloneOrNull(topInventory.getItem(i)));
                 }
                 final Map<Integer, ItemStack> afterState = InventoryUtils.predictTopInventoryChanges(event);
+                final InventorySnapshot snapshot = new InventorySnapshot(topInventory);
+
 
                 for (final Map.Entry<Integer, ItemStack> entry : afterState.entrySet()) {
                     final int slotIndex = entry.getKey();
+                    final ItemStack beforeStack = beforeState.get(slotIndex);
+                    final ItemStack newStack = entry.getValue();
 
-                    if (Objects.equals(beforeState.get(slotIndex), entry.getValue())) {
+                    if (Objects.equals(beforeStack, newStack)) {
                         continue;
                     }
-                    onChange.accept(new VirtualContainerViewComponent.ChangeEvent(
-                        player, slotIndex, beforeState.get(slotIndex), entry.getValue()
-                    ));
+                    snapshot.setItemSilently(slotIndex, newStack);
                 }
+                // Wrap onChange callbacks in batch to coalesce state changes
+                playerSession.reconciler.batch(() -> {
+                    for (final Map.Entry<Integer, ItemStack> entry : afterState.entrySet()) {
+                        final int slotIndex = entry.getKey();
+                        final ItemStack beforeStack = beforeState.get(slotIndex);
+                        final ItemStack newStack = entry.getValue();
+
+                        if (Objects.equals(beforeStack, newStack)) {
+                            continue;
+                        }
+                        onChange.accept(
+                            new VirtualContainerViewComponent.ChangeEvent(
+                                player,
+                                slotIndex,
+                                beforeStack,
+                                newStack,
+                                snapshot,
+                                new VirtualContainerViewComponent.SnapshotHandleImpl(editableSlot.handleRef().get(), snapshot)
+                            )
+                        );
+                    }
+                });
+                snapshot.reconcile();
+
                 return;
             }
             // Non-editable slot inside the view — block vanilla behavior and route to click handler if any
@@ -595,7 +701,9 @@ public final class ViewManager {
             event.setCancelled(true);
 
             if (clickHandler != null) {
-                clickHandler.accept(new ClickContext(player, event));
+                playerSession.reconciler.batch(() -> {
+                    clickHandler.accept(new ClickContext(player, event));
+                });
             }
         }
 
@@ -665,6 +773,7 @@ public final class ViewManager {
                 return;
             }
             final Map<Integer, ItemStack> newItems = event.getNewItems();
+            final InventorySnapshot snapshot = new InventorySnapshot(topInventory);
 
             for (final int rawSlot : event.getRawSlots()) {
                 if (rawSlot >= topInventory.getSize()) {
@@ -672,19 +781,38 @@ public final class ViewManager {
                 }
                 final ViewRenderable renderable = session.session.renderer().renderables().get(rawSlot);
 
-                if (!(renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot) || editableSlot.onChange() == null) {
+                if (!(renderable instanceof VirtualContainerViewComponent.EditableSlot)) {
                     continue;
                 }
                 final ItemStack newItem = newItems.get(rawSlot);
-                final var changeEvent = new VirtualContainerViewComponent.ChangeEvent(
-                    player,
-                    rawSlot,
-                    oldItems.get(rawSlot),
-                    newItem
-                );
 
-                editableSlot.onChange().accept(changeEvent);
+                snapshot.setItemSilently(rawSlot, newItem);
             }
+            // Wrap onChange callbacks in batch to coalesce state changes
+            session.reconciler.batch(() -> {
+                for (final int rawSlot : event.getRawSlots()) {
+                    if (rawSlot >= topInventory.getSize()) {
+                        continue;
+                    }
+                    final ViewRenderable renderable = session.session.renderer().renderables().get(rawSlot);
+
+                    if (!(renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot) || editableSlot.onChange() == null) {
+                        continue;
+                    }
+                    final ItemStack newItem = newItems.get(rawSlot);
+                    final var changeEvent = new VirtualContainerViewComponent.ChangeEvent(
+                        player,
+                        rawSlot,
+                        oldItems.get(rawSlot),
+                        newItem,
+                        snapshot,
+                        new VirtualContainerViewComponent.SnapshotHandleImpl(editableSlot.handleRef().get(), snapshot)
+                    );
+
+                    editableSlot.onChange().accept(changeEvent);
+                }
+            });
+            snapshot.reconcile();
         }
 
         /**

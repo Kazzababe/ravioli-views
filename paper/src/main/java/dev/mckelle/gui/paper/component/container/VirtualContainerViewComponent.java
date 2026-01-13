@@ -1,5 +1,6 @@
 package dev.mckelle.gui.paper.component.container;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import dev.mckelle.gui.api.component.ViewComponentBase;
 import dev.mckelle.gui.api.context.IRenderContext;
@@ -9,17 +10,24 @@ import dev.mckelle.gui.paper.compat.InventoryViewAdapter;
 import dev.mckelle.gui.paper.compat.InventoryViewAdapterFactory;
 import dev.mckelle.gui.paper.component.ViewComponent;
 import dev.mckelle.gui.paper.context.RenderContext;
+import dev.mckelle.gui.paper.util.InventorySnapshot;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /**
  * A Paper-specific "virtual chest" region where every slot is fully editable by the player.
@@ -40,19 +48,34 @@ import java.util.function.Predicate;
  */
 public final class VirtualContainerViewComponent extends ViewComponent<Void> {
     private static final InventoryViewAdapter ADAPTER = InventoryViewAdapterFactory.get();
-    
+
     /**
      * An imperative handle for interacting with the contents of a {@link VirtualContainerViewComponent}
      * after it has been rendered.
+     * <p>
+     * This interface extends {@link ItemContainer} for read operations, allowing methods to accept
+     * either a {@code Handle} or a {@code SnapshotHandle}.
+     * </p>
      */
-    public interface Handle {
+    public interface Handle extends ItemContainer {
         /**
          * Returns the live item in the specified container slot.
          *
          * @param slot The 0-based index of the slot.
          * @return The {@link ItemStack} in the slot, or {@code null} if the slot is empty or invalid.
          */
+        @Override
         @Nullable ItemStack get(int slot);
+
+        /**
+         * Retrieves the item located at the specified slot within the given inventory snapshot.
+         *
+         * @param snapshot The inventory snapshot from which to retrieve the item. Must not be null.
+         * @param slot     The 0-based index of the slot to retrieve the item from.
+         * @return The {@link ItemStack} located at the specified slot, or {@code null} if the slot is empty
+         *         or invalid.
+         */
+        @Nullable ItemStack get(@NotNull final InventorySnapshot snapshot, int slot);
 
         /**
          * Returns the live item at the specified 2D coordinates within the container.
@@ -61,7 +84,19 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
          * @param y The y-coordinate (row).
          * @return The {@link ItemStack} at the given coordinates, or {@code null} if the coordinates are out of bounds.
          */
+        @Override
         @Nullable ItemStack get(int x, int y);
+
+        /**
+         * Retrieves the item located at the specified 2D coordinates within the given inventory snapshot.
+         *
+         * @param snapshot The inventory snapshot from which to retrieve the item. Must not be null.
+         * @param x The x-coordinate (column) in the inventory.
+         * @param y The y-coordinate (row) in the inventory.
+         * @return The {@link ItemStack} located at the specified coordinates, or {@code null} if the coordinates are out of
+         *         bounds or the slot is empty.
+         */
+        @Nullable ItemStack get(@NotNull final InventorySnapshot snapshot, int x, int y);
 
         /**
          * Overwrites a slot with an {@link ItemStack}. Supplying {@code null}
@@ -73,10 +108,42 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
         void set(int slot, @Nullable ItemStack item);
 
         /**
+         * Overwrites a slot at the specified 2D coordinates with an {@link ItemStack}.
+         * Supplying {@code null} clears the slot and makes it editable by the player again.
+         *
+         * @param x    The x-coordinate (column).
+         * @param y    The y-coordinate (row).
+         * @param item The {@link ItemStack} to place, or {@code null} to clear it.
+         */
+        void set(int x, int y, @Nullable ItemStack item);
+
+        /**
+         * Sets the specified slot in the given inventory snapshot to the provided {@link ItemStack}.
+         * Supplying {@code null} will clear the slot.
+         *
+         * @param snapshot The inventory snapshot in which the slot resides. Must not be null.
+         * @param slot The 0-based index of the slot to set.
+         * @param item The {@link ItemStack} to place in the slot, or {@code null} to clear it.
+         */
+        void set(@NotNull final InventorySnapshot snapshot, int slot, @Nullable ItemStack item);
+
+        /**
+         * Sets the item at the specified 2D coordinates within the given inventory snapshot.
+         * Supplying {@code null} will clear the slot.
+         *
+         * @param snapshot The inventory snapshot in which the slot resides. Must not be null.
+         * @param x The x-coordinate (column) in the inventory.
+         * @param y The y-coordinate (row) in the inventory.
+         * @param item The {@link ItemStack} to place at the coordinates, or {@code null} to clear it.
+         */
+        void set(@NotNull final InventorySnapshot snapshot, int x, int y, @Nullable ItemStack item);
+
+        /**
          * Returns the total number of editable slots in this container.
          *
          * @return The size of the container (width × height).
          */
+        @Override
         int size();
 
         /**
@@ -87,16 +154,53 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
          * @return local slot index, or <code>-1</code> when the slot is outside the container.
          */
         int toLocalSlot(int rootSlot);
+
+        /**
+         * Returns an unmodifiable list of all items in this container.
+         * <p>
+         * The list is indexed by local slot (0 to size-1). Empty slots contain {@code null}.
+         * </p>
+         *
+         * @return An unmodifiable list of items.
+         */
+        @Override
+        @NotNull List<@Nullable ItemStack> items();
+
+        /**
+         * Returns a stream over the items in this container.
+         *
+         * @return A stream of items (may contain nulls for empty slots).
+         */
+        @Override
+        @NotNull Stream<@Nullable ItemStack> stream();
+
+        /**
+         * Returns the width (columns) of this container.
+         *
+         * @return The width.
+         */
+        int getWidth();
+
+        /**
+         * Returns the height (rows) of this container.
+         *
+         * @return The height.
+         */
+        int getHeight();
     }
 
     /**
      * A {@link ViewRenderable} that represents an empty, editable slot in a virtual container.
      *
-     * @param filter   A predicate that determines which {@link ItemStack}s are allowed to be placed in this slot.
-     * @param onChange A callback to be executed when the content of this slot changes.
+     * @param handleRef A reference to the container's {@link Handle}, used for creating {@link SnapshotHandle}s.
+     * @param filter    A predicate that determines which {@link ItemStack}s are allowed to be placed in this slot.
+     * @param onChange  A callback to be executed when the content of this slot changes.
      */
-    public record EditableSlot(@NotNull Predicate<@NotNull ItemStack> filter,
-                               @Nullable Consumer<ChangeEvent> onChange) implements ViewRenderable {
+    public record EditableSlot(
+        @NotNull Ref<Handle> handleRef,
+        @NotNull Predicate<@NotNull ItemStack> filter,
+        @Nullable Consumer<ChangeEvent> onChange
+    ) implements ViewRenderable {
     }
 
     private final int width;
@@ -133,7 +237,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
         this.backing = new ViewRenderable[width * height];
         this.initialItems = new ItemStack[width * height];
 
-        Arrays.fill(this.backing, new EditableSlot(this.filter, this.onChange));
+        Arrays.fill(this.backing, new EditableSlot(this.handleRef, this.filter, this.onChange));
     }
 
     /**
@@ -149,7 +253,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
             final ViewRenderable renderable = this.backing[i];
 
             if (renderable instanceof final EditableSlot editableSlot) {
-                this.backing[i] = new EditableSlot(editableSlot.filter, this.onChange);
+                this.backing[i] = new EditableSlot(this.handleRef, editableSlot.filter, this.onChange);
             }
         }
         return this;
@@ -166,7 +270,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
             final ViewRenderable renderable = this.backing[i];
 
             if (renderable instanceof final EditableSlot editableSlot && editableSlot.filter.equals(this.filter)) {
-                this.backing[i] = new EditableSlot(itemStackFilter, this.onChange);
+                this.backing[i] = new EditableSlot(this.handleRef, itemStackFilter, this.onChange);
             }
         }
         this.filter = itemStackFilter;
@@ -307,12 +411,25 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
             return this.inventory.getItem(this.toRootSlot(slot));
         }
 
+        @Override
+        public @Nullable ItemStack get(final @NotNull InventorySnapshot snapshot, final int slot) {
+            if (slot < 0 || slot >= VirtualContainerViewComponent.this.backing.length) {
+                return null;
+            }
+            return snapshot.getItem(this.toRootSlot(slot));
+        }
+
         /**
          * {@inheritDoc}
          */
         @Override
         public @Nullable ItemStack get(final int x, final int y) {
             return this.get(y * VirtualContainerViewComponent.this.width + x);
+        }
+
+        @Override
+        public @Nullable ItemStack get(final @NotNull InventorySnapshot snapshot, final int x, final int y) {
+            return this.get(snapshot, y * VirtualContainerViewComponent.this.width + x);
         }
 
         /**
@@ -324,6 +441,24 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
                 return;
             }
             this.inventory.setItem(this.toRootSlot(slot), item);
+        }
+
+        @Override
+        public void set(final int x, final int y, @Nullable final ItemStack item) {
+            this.set(y * VirtualContainerViewComponent.this.width + x, item);
+        }
+
+        @Override
+        public void set(final @NotNull InventorySnapshot snapshot, final int slot, @Nullable final ItemStack item) {
+            if (slot < 0 || slot >= VirtualContainerViewComponent.this.backing.length) {
+                return;
+            }
+            snapshot.setItem(this.toRootSlot(slot), item);
+        }
+
+        @Override
+        public void set(final @NotNull InventorySnapshot snapshot, final int x, final int y, @Nullable final ItemStack item) {
+            this.set(snapshot, y * VirtualContainerViewComponent.this.width + x, item);
         }
 
         /**
@@ -352,23 +487,226 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
                 VirtualContainerViewComponent.this.width +
                 (column - this.originX);
         }
+
+        @Override
+        public @NotNull List<@Nullable ItemStack> items() {
+            final List<ItemStack> result = new ArrayList<>(this.size());
+
+            for (int i = 0; i < this.size(); i++) {
+                result.add(this.get(i));
+            }
+            return Collections.unmodifiableList(result);
+        }
+
+        @Override
+        public @NotNull Stream<@Nullable ItemStack> stream() {
+            return this.items().stream();
+        }
+
+        @Override
+        public int getWidth() {
+            return VirtualContainerViewComponent.this.width;
+        }
+
+        @Override
+        public int getHeight() {
+            return VirtualContainerViewComponent.this.height;
+        }
     }
 
     /**
      * Represents a change event within a VirtualContainer.
      *
-     * @param player  The player who initiated the change.
-     * @param slot    The slot index within the container that was modified.
-     * @param oldItem The ItemStack that was in the slot before the change.
-     * @param newItem The ItemStack in the slot after the change.
+     * @param player   The player who initiated the change.
+     * @param slot     The slot index within the container that was modified.
+     * @param oldItem  The ItemStack that was in the slot before the change.
+     * @param newItem  The ItemStack in the slot after the change.
+     * @param snapshot The inventory snapshot reflecting the predicted state after the change.
+     * @param handle   A {@link SnapshotHandle} for interacting with the snapshot using container-local coordinates.
      */
     public record ChangeEvent(
         @NotNull Player player,
         int slot,
         @Nullable ItemStack oldItem,
-        @Nullable ItemStack newItem
+        @Nullable ItemStack newItem,
+        @NotNull InventorySnapshot snapshot,
+        @NotNull SnapshotHandle handle
     ) {
+        /**
+         * Creates a {@link SnapshotHandle} for another container using this event's snapshot.
+         * <p>
+         * This allows you to read the predicted state of other containers during an onChange callback,
+         * ensuring consistency across all containers in the view.
+         * </p>
+         * <p>
+         * <b>Example:</b>
+         * </p>
+         * <pre>{@code
+         * .onChange((event) -> {
+         *     SnapshotHandle ingredients = event.handle();  // This container
+         *     SnapshotHandle orb = event.createSnapshotHandle(arcaneOrbHandle);  // Other container
+         *
+         *     // Both use the same consistent snapshot
+         *     int ingredientWorth = calculateWorth(ingredients);
+         *     int orbAmount = getOrbAmount(orb);
+         * })
+         * }</pre>
+         *
+         * @param handleRef A reference to another container's {@link Handle}.
+         * @return A {@link SnapshotHandle} for the specified container, or {@code null} if the handle ref is empty.
+         */
+        public @Nullable SnapshotHandle createSnapshotHandle(@NotNull final Ref<Handle> handleRef) {
+            if (handleRef.isEmpty()) {
+                return null;
+            }
+            return new SnapshotHandleImpl(handleRef.get(), this.snapshot);
+        }
 
+        /**
+         * Creates a {@link SnapshotHandle} for another container using this event's snapshot.
+         * <p>
+         * This is a convenience overload that accepts a {@link Handle} directly instead of a {@link Ref}.
+         * </p>
+         *
+         * @param handle Another container's {@link Handle}.
+         * @return A {@link SnapshotHandle} for the specified container.
+         */
+        public @NotNull SnapshotHandle createSnapshotHandle(@NotNull final Handle handle) {
+            return new SnapshotHandleImpl(handle, this.snapshot);
+        }
+    }
+
+    /**
+     * A handle for interacting with an {@link InventorySnapshot} using container-local coordinates.
+     * <p>
+     * This wrapper is provided in {@link ChangeEvent} to simplify snapshot access during onChange callbacks.
+     * All slot indices and coordinates are relative to the container, not the root inventory.
+     * </p>
+     * <p>
+     * This interface extends {@link ItemContainer} for read operations, allowing methods to accept
+     * either a {@code Handle} or a {@code SnapshotHandle} without overloading.
+     * </p>
+     */
+    public interface SnapshotHandle extends ItemContainer {
+        /**
+         * Returns the item at the specified container-local slot within the snapshot.
+         *
+         * @param slot The 0-based local slot index.
+         * @return The {@link ItemStack} at the slot, or {@code null} if empty or invalid.
+         */
+        @Override
+        @Nullable ItemStack get(int slot);
+
+        /**
+         * Returns the item at the specified 2D coordinates within the snapshot.
+         *
+         * @param x The x-coordinate (column).
+         * @param y The y-coordinate (row).
+         * @return The {@link ItemStack} at the coordinates, or {@code null} if out of bounds.
+         */
+        @Override
+        @Nullable ItemStack get(int x, int y);
+
+        /**
+         * Sets the item at the specified container-local slot within the snapshot.
+         *
+         * @param slot The 0-based local slot index.
+         * @param item The {@link ItemStack} to set, or {@code null} to clear.
+         */
+        void set(int slot, @Nullable ItemStack item);
+
+        /**
+         * Sets the item at the specified 2D coordinates within the snapshot.
+         *
+         * @param x The x-coordinate (column).
+         * @param y The y-coordinate (row).
+         * @param item The {@link ItemStack} to set, or {@code null} to clear.
+         */
+        void set(int x, int y, @Nullable ItemStack item);
+
+        /**
+         * Returns the number of slots in this container.
+         *
+         * @return The container size.
+         */
+        @Override
+        int size();
+
+        /**
+         * Returns an unmodifiable list of all items in this snapshot's container view.
+         *
+         * @return An unmodifiable list of items.
+         */
+        @Override
+        @NotNull List<@Nullable ItemStack> items();
+
+        /**
+         * Returns a stream over the items in this snapshot's container view.
+         *
+         * @return A stream of items (may contain nulls for empty slots).
+         */
+        @Override
+        @NotNull Stream<@Nullable ItemStack> stream();
+    }
+
+    /**
+     * Default implementation of {@link SnapshotHandle} that delegates to a {@link Handle}
+     * with snapshot-aware methods.
+     */
+    public static final class SnapshotHandleImpl implements SnapshotHandle {
+        private final Handle handle;
+        private final InventorySnapshot snapshot;
+
+        /**
+         * Creates a new SnapshotHandle wrapping the given handle and snapshot.
+         *
+         * @param handle   The handle providing coordinate translation.
+         * @param snapshot The snapshot to read from and write to.
+         */
+        public SnapshotHandleImpl(@NotNull final Handle handle, @NotNull final InventorySnapshot snapshot) {
+            this.handle = handle;
+            this.snapshot = snapshot;
+        }
+
+        @Override
+        public @Nullable ItemStack get(final int slot) {
+            return this.handle.get(this.snapshot, slot);
+        }
+
+        @Override
+        public @Nullable ItemStack get(final int x, final int y) {
+            return this.handle.get(this.snapshot, x, y);
+        }
+
+        @Override
+        public void set(final int slot, @Nullable final ItemStack item) {
+            this.handle.set(this.snapshot, slot, item);
+        }
+
+        @Override
+        public void set(final int x, final int y, @Nullable final ItemStack item) {
+            this.handle.set(this.snapshot, x, y, item);
+        }
+
+        @Override
+        public int size() {
+            return this.handle.size();
+        }
+
+        @Override
+        public @NotNull List<@Nullable ItemStack> items() {
+            final List<ItemStack> result = new ArrayList<>(this.size());
+
+            for (int i = 0; i < this.size(); i++) {
+                result.add(this.get(i));
+            }
+            return Collections.unmodifiableList(result);
+        }
+
+        @Override
+        public @NotNull Stream<@Nullable ItemStack> stream() {
+            return this.items().stream();
+        }
     }
 
     /**
@@ -485,10 +823,11 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
             if (this.width == null || this.height == null) {
                 throw new IllegalStateException("size(width,height) is required");
             }
-            if (this.handleRef == null) {
-                throw new IllegalStateException("handle(ref) is required");
-            }
-            final VirtualContainerViewComponent component = new VirtualContainerViewComponent(this.key, this.width, this.height, this.handleRef);
+            // Create internal ref if not provided
+            final Ref<Handle> effectiveHandleRef = this.handleRef != null
+                ? this.handleRef
+                : new Ref<>(null);
+            final VirtualContainerViewComponent component = new VirtualContainerViewComponent(this.key, this.width, this.height, effectiveHandleRef);
 
             component.filter(this.filter);
 
