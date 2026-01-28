@@ -263,6 +263,7 @@ public final class ViewManager {
                                 visited,
                                 requestUpdateFn,
                                 session.inventory(),
+                                ViewManager.this.plugin,
                                 width,
                                 height
                             );
@@ -307,6 +308,7 @@ public final class ViewManager {
                         visited,
                         requestUpdateFn,
                         session.inventory(),
+                        ViewManager.this.plugin,
                         9,
                         session.inventory().getSize() / 9
                     );

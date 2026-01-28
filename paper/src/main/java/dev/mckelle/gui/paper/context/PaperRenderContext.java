@@ -14,6 +14,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -35,6 +36,7 @@ public class PaperRenderContext<D> extends RootRenderContext<Player, D, ClickCon
     private static final InventoryViewAdapter ADAPTER = InventoryViewAdapterFactory.get();
     
     private final Inventory inventory;
+    private final Plugin plugin;
 
     /**
      * Constructs a new Paper-specific root render context.
@@ -50,6 +52,7 @@ public class PaperRenderContext<D> extends RootRenderContext<Player, D, ClickCon
      * @param visited     A set to track visited component paths for state cleanup.
      * @param schedule    A runnable that triggers a view update.
      * @param inventory   The Bukkit inventory this context is rendering into.
+     * @param plugin      The plugin instance.
      * @param width       The width of the view
      * @param height      The height of the view
      */
@@ -65,6 +68,7 @@ public class PaperRenderContext<D> extends RootRenderContext<Player, D, ClickCon
         @NotNull final Set<String> visited,
         @NotNull final Runnable schedule,
         @NotNull final Inventory inventory,
+        @NotNull final Plugin plugin,
         final int width,
         final int height
     ) {
@@ -84,6 +88,7 @@ public class PaperRenderContext<D> extends RootRenderContext<Player, D, ClickCon
         );
 
         this.inventory = inventory;
+        this.plugin = plugin;
     }
 
     /**
@@ -92,6 +97,11 @@ public class PaperRenderContext<D> extends RootRenderContext<Player, D, ClickCon
     @Override
     public @NotNull Inventory getInventory() {
         return this.inventory;
+    }
+
+    @Override
+    public @NotNull Plugin getPlugin() {
+        return this.plugin;
     }
 
     /**
@@ -109,7 +119,7 @@ public class PaperRenderContext<D> extends RootRenderContext<Player, D, ClickCon
         final int width,
         final int height
     ) {
-        return new PaperChildContext<>(props, x, y, width, height, this.inventory);
+        return new PaperChildContext<>(props, x, y, width, height, this.inventory, this.plugin);
     }
 
     /**
@@ -146,6 +156,7 @@ public class PaperRenderContext<D> extends RootRenderContext<Player, D, ClickCon
      */
     public final class PaperChildContext<K> extends ChildContext<K> implements RenderContext<K> {
         private final Inventory inventory;
+        private final Plugin plugin;
 
         /**
          * Constructs a new Paper-specific child render context.
@@ -156,6 +167,7 @@ public class PaperRenderContext<D> extends RootRenderContext<Player, D, ClickCon
          * @param width     The width of this context's renderable area.
          * @param height    The height of this context's renderable area.
          * @param inventory The root Bukkit inventory being rendered to.
+         * @param plugin    The plugin instance.
          */
         public PaperChildContext(
             @Nullable final K props,
@@ -163,11 +175,13 @@ public class PaperRenderContext<D> extends RootRenderContext<Player, D, ClickCon
             final int originY,
             final int width,
             final int height,
-            @NotNull final Inventory inventory
+            @NotNull final Inventory inventory,
+            @NotNull final Plugin plugin
         ) {
             super(props, originX, originY, width, height);
 
             this.inventory = inventory;
+            this.plugin = plugin;
         }
 
         /**
@@ -176,6 +190,14 @@ public class PaperRenderContext<D> extends RootRenderContext<Player, D, ClickCon
         @Override
         public @NotNull Inventory getInventory() {
             return this.inventory;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public @NotNull Plugin getPlugin() {
+            return this.plugin;
         }
 
         @Override

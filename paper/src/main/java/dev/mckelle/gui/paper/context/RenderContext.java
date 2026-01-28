@@ -3,6 +3,7 @@ package dev.mckelle.gui.paper.context;
 import dev.mckelle.gui.api.context.IRenderContext;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -27,4 +28,13 @@ public interface RenderContext<D> extends IRenderContext<Player, D, ClickContext
      */
     @NotNull
     Inventory getInventory();
+
+    /**
+     * Retrieves the {@link Plugin} associated with the current GUI framework.
+     * The plugin is used to register tasks, events, and other Bukkit-specific functionality
+     * needed by the GUI context.
+     *
+     * @return the {@link Plugin} instance associated with the GUI framework; never null
+     */
+    @NotNull Plugin getPlugin();
 }
