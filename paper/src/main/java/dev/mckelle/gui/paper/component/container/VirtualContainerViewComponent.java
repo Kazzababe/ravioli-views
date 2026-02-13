@@ -1,14 +1,16 @@
 package dev.mckelle.gui.paper.component.container;
 
-import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
+import com.google.common.util.concurrent.Runnables;
 import dev.mckelle.gui.api.component.ViewComponentBase;
 import dev.mckelle.gui.api.context.IRenderContext;
 import dev.mckelle.gui.api.render.ViewRenderable;
+import dev.mckelle.gui.api.state.BooleanRef;
 import dev.mckelle.gui.api.state.Ref;
 import dev.mckelle.gui.paper.compat.InventoryViewAdapter;
 import dev.mckelle.gui.paper.compat.InventoryViewAdapterFactory;
 import dev.mckelle.gui.paper.component.ViewComponent;
+import dev.mckelle.gui.paper.component.container.virtual.data.VirtualContainerDataBinding;
 import dev.mckelle.gui.paper.context.RenderContext;
 import dev.mckelle.gui.paper.util.InventorySnapshot;
 import org.bukkit.entity.Player;
@@ -20,8 +22,6 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -210,6 +210,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
     private final Ref<Handle> handleRef;
     private final ViewRenderable[] backing;
     private final ItemStack[] initialItems;
+    private VirtualContainerDataBinding<?> binding;
     private Predicate<ItemStack> filter = Predicates.alwaysTrue();
     private Consumer<ChangeEvent> onChange = null;
     private Consumer<BatchChangeEvent> onBatchChange = null;
@@ -369,9 +370,23 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
      */
     @Override
     public void render(@NotNull final RenderContext<Void> context) {
-        final Ref<Boolean> hasRendered = context.useRef(false);
+        final BooleanRef hasRendered = context.useRef(false);
 
         this.handleRef.set(new ImperativeHandle(context));
+
+        context.useEffect(() -> {
+            final var binding = this.binding;
+
+            if (binding == null) {
+                return Runnables.doNothing();
+            }
+            final var subscription = binding.subscribe(this.handleRef.get(), this.backing.length);
+
+            return () -> binding.unsubscribe(subscription);
+        }, List.of(
+            this.backing.length,
+            this.binding == null ? "null" : this.binding.getDataSource()
+        ));
 
         if (!hasRendered.get()) {
             for (int i = 0; i < this.backing.length; i++) {
@@ -887,6 +902,14 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
          */
         @Override
         @NotNull Stream<@Nullable ItemStack> stream();
+
+        /**
+         * Converts a root-inventory slot index to this container’s local slot index <b>(0 – size-1)</b>.
+         *
+         * @param rootSlot the absolute slot index in the top inventory.
+         * @return local slot index, or <code>-1</code> when the slot is outside the container.
+         */
+        int toLocalSlot(int rootSlot);
     }
 
     /**
@@ -934,6 +957,11 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
         }
 
         @Override
+        public int toLocalSlot(final int rootSlot) {
+            return this.handle.toLocalSlot(rootSlot);
+        }
+
+        @Override
         public @NotNull List<@Nullable ItemStack> items() {
             final List<ItemStack> result = new ArrayList<>(this.size());
 
@@ -966,6 +994,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
         private Integer width;
         private Integer height;
         private Ref<Handle> handleRef;
+        private VirtualContainerDataBinding<?> binding;
         private Predicate<ItemStack> filter = Predicates.alwaysTrue();
         private Consumer<ChangeEvent> onChange;
         private Consumer<BatchChangeEvent> onBatchChange;
@@ -1042,6 +1071,29 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
         }
 
         /**
+         * Binds this virtual container to a {@link VirtualContainerDataBinding}, enabling
+         * automatic two-way synchronisation between the container and an external data source.
+         * <p>
+         * When a binding is set, the container will:
+         * <ul>
+         *   <li>Populate initial items from the data source on first render</li>
+         *   <li>Subscribe to data source changes and sync them into the container</li>
+         *   <li>Write player-made changes back to the data source</li>
+         *   <li>Apply the binding's domain-level filter (if any) in addition to any
+         *       explicit {@link #filter} set on this builder</li>
+         * </ul>
+
+         *
+         * @param binding the data binding configuration
+         * @return this builder
+         */
+        public @NotNull Builder bind(@NotNull final VirtualContainerDataBinding<?> binding) {
+            this.binding = binding;
+
+            return this;
+        }
+
+        /**
          * Sets initial items using a slot->item map.
          *
          * @param itemsBySlot map of local slot index to ItemStack
@@ -1076,25 +1128,38 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
             if (this.width == null || this.height == null) {
                 throw new IllegalStateException("size(width,height) is required");
             }
-            // Create internal ref if not provided
             final Ref<Handle> effectiveHandleRef = this.handleRef != null
                 ? this.handleRef
                 : new Ref<>(null);
             final VirtualContainerViewComponent component = new VirtualContainerViewComponent(this.key, this.width, this.height, effectiveHandleRef);
 
-            component.filter(this.filter);
+            if (this.binding != null) {
+                component.binding = this.binding;
+                component.initialItems(this.binding.createInitialItemSupplier());
+                component.onBatchChange(this.binding.createBatchChangeHandler(this.onBatchChange));
 
+                final Predicate<ItemStack> domainFilter = this.binding.createItemStackFilter();
+
+                if (domainFilter != null) {
+                    component.filter(this.filter.and(domainFilter));
+                } else {
+                    component.filter(this.filter);
+                }
+            } else {
+                component.filter(this.filter);
+
+                if (this.onBatchChange != null) {
+                    component.onBatchChange(this.onBatchChange);
+                }
+                if (this.initialItemsBySlot != null) {
+                    component.initialItems(this.initialItemsBySlot);
+                }
+                if (this.initialItemSupplier != null) {
+                    component.initialItems(this.initialItemSupplier);
+                }
+            }
             if (this.onChange != null) {
                 component.onChange(this.onChange);
-            }
-            if (this.onBatchChange != null) {
-                component.onBatchChange(this.onBatchChange);
-            }
-            if (this.initialItemsBySlot != null) {
-                component.initialItems(this.initialItemsBySlot);
-            }
-            if (this.initialItemSupplier != null) {
-                component.initialItems(this.initialItemSupplier);
             }
             return component;
         }
@@ -1109,4 +1174,5 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
             return this;
         }
     }
+
 }

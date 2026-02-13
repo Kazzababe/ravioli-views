@@ -16,10 +16,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Spliterator;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 /**
  * An immutable snapshot of an inventory's contents at a point in time.

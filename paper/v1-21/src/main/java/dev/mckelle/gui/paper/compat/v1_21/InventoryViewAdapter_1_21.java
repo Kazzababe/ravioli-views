@@ -2,8 +2,6 @@ package dev.mckelle.gui.paper.compat.v1_21;
 
 import dev.mckelle.gui.paper.compat.InventoryViewAdapter;
 import org.bukkit.entity.HumanEntity;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;

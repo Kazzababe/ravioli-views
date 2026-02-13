@@ -1,8 +1,6 @@
 package dev.mckelle.gui.paper.compat;
 
 import org.bukkit.entity.HumanEntity;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;

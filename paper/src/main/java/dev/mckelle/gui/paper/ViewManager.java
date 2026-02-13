@@ -12,6 +12,8 @@ import dev.mckelle.gui.core.ViewRegistry;
 import dev.mckelle.gui.paper.compat.InventoryViewAdapter;
 import dev.mckelle.gui.paper.compat.InventoryViewAdapterFactory;
 import dev.mckelle.gui.paper.component.container.VirtualContainerViewComponent;
+import dev.mckelle.gui.paper.component.container.VirtualContainerViewComponent.ChangeEvent;
+import dev.mckelle.gui.paper.component.container.VirtualContainerViewComponent.EditableSlot;
 import dev.mckelle.gui.paper.context.ClickContext;
 import dev.mckelle.gui.paper.context.CloseContext;
 import dev.mckelle.gui.paper.context.InitContext;
@@ -443,7 +445,7 @@ public final class ViewManager {
                 // Track changes to fire onChange after all mutations, grouped by EditableSlot
                 final Map<Integer, ItemStack> oldItems = new HashMap<>();
                 final Map<Integer, ItemStack> newItems = new HashMap<>();
-                final Map<Integer, VirtualContainerViewComponent.EditableSlot> affectedSlots = new HashMap<>();
+                final Map<Integer, EditableSlot> affectedSlots = new HashMap<>();
 
                 // Merge into existing stacks first
                 for (int slotIndex = 0; slotIndex < topInventory.getSize(); slotIndex++) {
@@ -452,7 +454,7 @@ public final class ViewManager {
                     }
                     final var possibleSlot = playerSession.session.renderer().renderables().get(slotIndex);
 
-                    if (!(possibleSlot instanceof final VirtualContainerViewComponent.EditableSlot editableSlot)) {
+                    if (!(possibleSlot instanceof final EditableSlot editableSlot)) {
                         continue;
                     }
                     // Check this specific slot's filter
@@ -491,7 +493,7 @@ public final class ViewManager {
                         }
                         final var possibleSlot = playerSession.session.renderer().renderables().get(slotIndex);
 
-                        if (!(possibleSlot instanceof final VirtualContainerViewComponent.EditableSlot editableSlot)) {
+                        if (!(possibleSlot instanceof final EditableSlot editableSlot)) {
                             continue;
                         }
                         // Check this specific slot's filter
@@ -510,10 +512,6 @@ public final class ViewManager {
                         topInventory.setItem(slotIndex, newItem);
                         itemToMove.setAmount(itemToMove.getAmount() - amountToTransfer);
 
-                        if (itemToMove.isEmpty()) {
-                            clickedInventory.setItem(event.getSlot(), null);
-                        }
-
                         // Track the change
                         oldItems.put(slotIndex, null);
                         newItems.put(slotIndex, newItem.clone());
@@ -522,6 +520,13 @@ public final class ViewManager {
                         // Update the snapshot to reflect the new state
                         snapshot.setItemSilently(slotIndex, newItem.clone());
                     }
+                }
+                
+                // Update the source inventory with what is left (or empty if all moved)
+                if (itemToMove.isEmpty()) {
+                     clickedInventory.setItem(event.getSlot(), null);
+                } else {
+                     clickedInventory.setItem(event.getSlot(), itemToMove);
                 }
                 // No changes occurred
                 if (newItems.isEmpty()) {
@@ -534,13 +539,13 @@ public final class ViewManager {
                     originalState.put(slotIndex, oldItems.get(slotIndex));
                 }
                 // Collect change events for batch callback
-                final List<VirtualContainerViewComponent.ChangeEvent> changeEvents = new ArrayList<>();
+                final List<ChangeEvent> changeEvents = new ArrayList<>();
 
                 for (final int slotIndex : newItems.keySet()) {
-                    final VirtualContainerViewComponent.EditableSlot editableSlot = affectedSlots.get(slotIndex);
+                    final EditableSlot editableSlot = affectedSlots.get(slotIndex);
 
                     changeEvents.add(
-                        new VirtualContainerViewComponent.ChangeEvent(
+                        new ChangeEvent(
                             player,
                             slotIndex,
                             oldItems.get(slotIndex),
@@ -551,7 +556,7 @@ public final class ViewManager {
                     );
                 }
                 // Get the first slot's onBatchChange callback (all slots in same container should share it)
-                final VirtualContainerViewComponent.EditableSlot firstSlot = affectedSlots.values().iterator().next();
+                final EditableSlot firstSlot = affectedSlots.values().iterator().next();
                 final Consumer<VirtualContainerViewComponent.BatchChangeEvent> onBatchChange = firstSlot.onBatchChange();
                 final var batchEvent = new VirtualContainerViewComponent.BatchChangeEvent(
                     player,
@@ -563,8 +568,8 @@ public final class ViewManager {
                 // Fire onChange for each slot, then fire onBatchChange
                 // Wrap in batch to coalesce any state changes made during callbacks
                 playerSession.reconciler.batch(() -> {
-                    for (final VirtualContainerViewComponent.ChangeEvent changeEvent : changeEvents) {
-                        final VirtualContainerViewComponent.EditableSlot editableSlot = affectedSlots.get(changeEvent.slot());
+                    for (final ChangeEvent changeEvent : changeEvents) {
+                        final EditableSlot editableSlot = affectedSlots.get(changeEvent.slot());
                         final var onChange = editableSlot.onChange();
 
                         if (onChange != null) {
@@ -606,7 +611,7 @@ public final class ViewManager {
                     }
                     final ViewRenderable renderable = playerSession.session.renderer().renderables().get(slotIndex);
 
-                    if (!(renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot)) {
+                    if (!(renderable instanceof final EditableSlot editableSlot)) {
                         event.setCancelled(true);
 
                         return;
@@ -618,6 +623,8 @@ public final class ViewManager {
                     }
                 }
                 final InventorySnapshot snapshot = new InventorySnapshot(topInventory);
+                final AtomicBoolean cancelled = new AtomicBoolean(false);
+                final Map<EditableSlot, List<ChangeEvent>> changesBySlot = new HashMap<>();
 
                 // Wrap onChange callbacks in batch to coalesce state changes
                 playerSession.reconciler.batch(() -> {
@@ -629,21 +636,59 @@ public final class ViewManager {
                         }
                         final ViewRenderable renderable = playerSession.session.renderer().renderables().get(slotIndex);
 
-                        if (renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot
-                            && editableSlot.onChange() != null) {
-                            editableSlot.onChange().accept(
-                                new VirtualContainerViewComponent.ChangeEvent(
-                                    player,
-                                    slotIndex,
-                                    beforeState.get(slotIndex),
-                                    entry.getValue(),
-                                    snapshot,
-                                    new VirtualContainerViewComponent.SnapshotHandleImpl(editableSlot.handleRef().get(), snapshot)
-                                )
-                            );
+                        if (!(renderable instanceof final EditableSlot editableSlot)) {
+                            continue;
+                        }
+                        final var changeEvent = new ChangeEvent(
+                            player,
+                            slotIndex,
+                            beforeState.get(slotIndex),
+                            entry.getValue(),
+                            snapshot,
+                            new VirtualContainerViewComponent.SnapshotHandleImpl(editableSlot.handleRef().get(), snapshot)
+                        );
+
+                        changesBySlot.computeIfAbsent(editableSlot, (key) -> new ArrayList<>()).add(changeEvent);
+
+                        if (editableSlot.onChange() != null) {
+                            editableSlot.onChange().accept(changeEvent);
+                        }
+                        if (changeEvent.isCancelled()) {
+                            cancelled.set(true);
+                        }
+                    }
+                    if (cancelled.get()) {
+                        return;
+                    }
+                    // Fire Batch Change callbacks for each affected container/slot-group
+                    for (final var batchEntry : changesBySlot.entrySet()) {
+                        final var slotConfig = batchEntry.getKey();
+                        final var events = batchEntry.getValue();
+                        final var onBatchChange = slotConfig.onBatchChange();
+
+                        if (onBatchChange == null) {
+                            continue;
+                        }
+                        final var batchEvent = new VirtualContainerViewComponent.BatchChangeEvent(
+                            player,
+                            events,
+                            snapshot,
+                            new VirtualContainerViewComponent.SnapshotHandleImpl(slotConfig.handleRef().get(), snapshot)
+                        );
+
+                        onBatchChange.accept(batchEvent);
+
+                        if (batchEvent.isCancelled()) {
+                            cancelled.set(true);
                         }
                     }
                 });
+
+                if (cancelled.get()) {
+                    event.setCancelled(true);
+
+                    return;
+                }
                 snapshot.reconcile();
 
                 return;
@@ -651,9 +696,9 @@ public final class ViewManager {
             // Clicked in top inventory
             final ViewRenderable renderable = playerSession.session.renderer().renderables().get(event.getRawSlot());
 
-            if (renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot) {
+            if (renderable instanceof final EditableSlot editableSlot) {
                 final Predicate<ItemStack> filter = editableSlot.filter();
-                final Consumer<VirtualContainerViewComponent.ChangeEvent> onChange = editableSlot.onChange();
+                final Consumer<ChangeEvent> onChange = editableSlot.onChange();
                 // Determine the incoming stack for all relevant "place into top" actions
                 final ItemStack candidateToPlace;
 
@@ -710,11 +755,12 @@ public final class ViewManager {
                 }
                 // Track cancellation
                 final AtomicBoolean cancelled = new AtomicBoolean(false);
-                final List<VirtualContainerViewComponent.ChangeEvent> changeEvents = new ArrayList<>();
+                // Group changes by the EditableSlot definition (which maps to specific container configurations)
+                final Map<EditableSlot, List<ChangeEvent>> changesBySlot = new HashMap<>();
 
                 // Wrap onChange callbacks in batch to coalesce state changes
                 playerSession.reconciler.batch(() -> {
-                    for (final Map.Entry<Integer, ItemStack> entry : afterState.entrySet()) {
+                    for (final var entry : afterState.entrySet()) {
                         final int slotIndex = entry.getKey();
                         final ItemStack beforeStack = beforeState.get(slotIndex);
                         final ItemStack newStack = entry.getValue();
@@ -722,44 +768,60 @@ public final class ViewManager {
                         if (Objects.equals(beforeStack, newStack)) {
                             continue;
                         }
-                        final var changeEvent = new VirtualContainerViewComponent.ChangeEvent(
+                        // Determine the specific renderable for the slot that is changing
+                        final ViewRenderable slotRenderable = playerSession.session.renderer().renderables().get(slotIndex);
+
+                        // If a change is predicted for a slot that isn't editable, we must cancel the entire interaction
+                        if (!(slotRenderable instanceof final EditableSlot targetSlot)) {
+                            cancelled.set(true);
+
+                            return;
+                        }
+                        final var changeEvent = new ChangeEvent(
                             player,
                             slotIndex,
                             beforeStack,
                             newStack,
                             snapshot,
-                            new VirtualContainerViewComponent.SnapshotHandleImpl(editableSlot.handleRef().get(), snapshot)
+                            new VirtualContainerViewComponent.SnapshotHandleImpl(targetSlot.handleRef().get(), snapshot)
                         );
-                        changeEvents.add(changeEvent);
-                        
-                        if (onChange != null) {
-                            onChange.accept(changeEvent);
+
+                        changesBySlot.computeIfAbsent(targetSlot, (key) -> new ArrayList<>()).add(changeEvent);
+
+                        if (targetSlot.onChange() != null) {
+                            targetSlot.onChange().accept(changeEvent);
                         }
-                        
                         if (changeEvent.isCancelled()) {
                             cancelled.set(true);
                         }
                     }
-                    
-                    if (!changeEvents.isEmpty()) {
-                        final Consumer<VirtualContainerViewComponent.BatchChangeEvent> onBatchChange = editableSlot.onBatchChange();
-                        
-                        if (onBatchChange != null) {
-                            final var batchEvent = new VirtualContainerViewComponent.BatchChangeEvent(
-                                player,
-                                changeEvents,
-                                snapshot,
-                                new VirtualContainerViewComponent.SnapshotHandleImpl(editableSlot.handleRef().get(), snapshot)
-                            );
-                            onBatchChange.accept(batchEvent);
-                            
-                            if (batchEvent.isCancelled()) {
-                                cancelled.set(true);
-                            }
+                    if (cancelled.get()) {
+                        return;
+                    }
+                    // Fire Batch Change callbacks for each affected container/slot-group
+                    for (final var batchEntry : changesBySlot.entrySet()) {
+                        final var slotConfig = batchEntry.getKey();
+                        final var events = batchEntry.getValue();
+                        final var onBatchChange = slotConfig.onBatchChange();
+
+                        if (onBatchChange == null) {
+                            continue;
+                        }
+                        final var batchEvent = new VirtualContainerViewComponent.BatchChangeEvent(
+                            player,
+                            events,
+                            snapshot,
+                            new VirtualContainerViewComponent.SnapshotHandleImpl(slotConfig.handleRef().get(), snapshot)
+                        );
+
+                        onBatchChange.accept(batchEvent);
+
+                        if (batchEvent.isCancelled()) {
+                            cancelled.set(true);
                         }
                     }
                 });
-                
+
                 if (cancelled.get()) {
                     event.setCancelled(true);
 
@@ -777,11 +839,12 @@ public final class ViewManager {
 
             event.setCancelled(true);
 
-            if (clickHandler != null) {
-                playerSession.reconciler.batch(() -> {
-                    clickHandler.accept(new ClickContext(player, event));
-                });
+            if (clickHandler == null) {
+                return;
             }
+            playerSession.reconciler.batch(() -> {
+                clickHandler.accept(new ClickContext(player, event));
+            });
         }
 
         /**
@@ -834,7 +897,7 @@ public final class ViewManager {
                     oldItem == null ? null : oldItem.clone()
                 );
 
-                if (renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot) {
+                if (renderable instanceof final EditableSlot editableSlot) {
                     if (!editableSlot.filter().test(draggedItem)) {
                         event.setCancelled(true);
 
@@ -851,8 +914,8 @@ public final class ViewManager {
             }
             final Map<Integer, ItemStack> newItems = event.getNewItems();
             final InventorySnapshot snapshot = new InventorySnapshot(topInventory);
-            final List<VirtualContainerViewComponent.ChangeEvent> changeEvents = new ArrayList<>();
-            final Map<Integer, VirtualContainerViewComponent.EditableSlot> affectedSlots = new HashMap<>();
+            final List<ChangeEvent> changeEvents = new ArrayList<>();
+            final Map<Integer, EditableSlot> affectedSlots = new HashMap<>();
 
             for (final int rawSlot : event.getRawSlots()) {
                 if (rawSlot >= topInventory.getSize()) {
@@ -860,7 +923,7 @@ public final class ViewManager {
                 }
                 final ViewRenderable renderable = session.session.renderer().renderables().get(rawSlot);
 
-                if (!(renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot)) {
+                if (!(renderable instanceof final EditableSlot editableSlot)) {
                     continue;
                 }
                 final ItemStack newItem = newItems.get(rawSlot);
@@ -868,7 +931,7 @@ public final class ViewManager {
                 snapshot.setItemSilently(rawSlot, newItem);
                 affectedSlots.put(rawSlot, editableSlot);
                 changeEvents.add(
-                    new VirtualContainerViewComponent.ChangeEvent(
+                    new ChangeEvent(
                         player,
                         rawSlot,
                         oldItems.get(rawSlot),
@@ -882,12 +945,9 @@ public final class ViewManager {
             if (changeEvents.isEmpty()) {
                 return;
             }
-
             // Get the first slot's onBatchChange callback (all slots in same container should share it)
-            final VirtualContainerViewComponent.EditableSlot firstSlot = affectedSlots.values().iterator().next();
+            final EditableSlot firstSlot = affectedSlots.values().iterator().next();
             final Consumer<VirtualContainerViewComponent.BatchChangeEvent> onBatchChange = firstSlot.onBatchChange();
-
-            // Create batch event
             final VirtualContainerViewComponent.BatchChangeEvent batchEvent =
                 new VirtualContainerViewComponent.BatchChangeEvent(
                     player,
@@ -898,8 +958,8 @@ public final class ViewManager {
 
             // Wrap onChange callbacks in batch to coalesce state changes
             session.reconciler.batch(() -> {
-                for (final VirtualContainerViewComponent.ChangeEvent changeEvent : changeEvents) {
-                    final VirtualContainerViewComponent.EditableSlot editableSlot = affectedSlots.get(changeEvent.slot());
+                for (final ChangeEvent changeEvent : changeEvents) {
+                    final EditableSlot editableSlot = affectedSlots.get(changeEvent.slot());
                     final var onChange = editableSlot.onChange();
 
                     if (onChange != null) {
@@ -915,9 +975,9 @@ public final class ViewManager {
 
             if (batchEvent.isCancelled()) {
                 event.setCancelled(true);
+
                 return;
             }
-
             snapshot.reconcile();
         }
 
