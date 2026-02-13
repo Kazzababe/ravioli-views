@@ -41,12 +41,14 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -521,29 +523,68 @@ public final class ViewManager {
                         snapshot.setItemSilently(slotIndex, newItem.clone());
                     }
                 }
+                // No changes occurred
+                if (newItems.isEmpty()) {
+                    return;
+                }
+                // Store original inventory state for potential revert
+                final Map<Integer, ItemStack> originalState = new HashMap<>();
 
-                // Now fire onChange for all affected slots with the fully-updated snapshot
+                for (final int slotIndex : newItems.keySet()) {
+                    originalState.put(slotIndex, oldItems.get(slotIndex));
+                }
+                // Collect change events for batch callback
+                final List<VirtualContainerViewComponent.ChangeEvent> changeEvents = new ArrayList<>();
+
+                for (final int slotIndex : newItems.keySet()) {
+                    final VirtualContainerViewComponent.EditableSlot editableSlot = affectedSlots.get(slotIndex);
+
+                    changeEvents.add(
+                        new VirtualContainerViewComponent.ChangeEvent(
+                            player,
+                            slotIndex,
+                            oldItems.get(slotIndex),
+                            newItems.get(slotIndex),
+                            snapshot,
+                            new VirtualContainerViewComponent.SnapshotHandleImpl(editableSlot.handleRef().get(), snapshot)
+                        )
+                    );
+                }
+                // Get the first slot's onBatchChange callback (all slots in same container should share it)
+                final VirtualContainerViewComponent.EditableSlot firstSlot = affectedSlots.values().iterator().next();
+                final Consumer<VirtualContainerViewComponent.BatchChangeEvent> onBatchChange = firstSlot.onBatchChange();
+                final var batchEvent = new VirtualContainerViewComponent.BatchChangeEvent(
+                    player,
+                    changeEvents,
+                    snapshot,
+                    new VirtualContainerViewComponent.SnapshotHandleImpl(firstSlot.handleRef().get(), snapshot)
+                );
+
+                // Fire onChange for each slot, then fire onBatchChange
                 // Wrap in batch to coalesce any state changes made during callbacks
                 playerSession.reconciler.batch(() -> {
-                    for (final int slotIndex : newItems.keySet()) {
-                        final VirtualContainerViewComponent.EditableSlot editableSlot = affectedSlots.get(slotIndex);
+                    for (final VirtualContainerViewComponent.ChangeEvent changeEvent : changeEvents) {
+                        final VirtualContainerViewComponent.EditableSlot editableSlot = affectedSlots.get(changeEvent.slot());
                         final var onChange = editableSlot.onChange();
 
-                        if (onChange == null) {
-                            continue;
+                        if (onChange != null) {
+                            onChange.accept(changeEvent);
                         }
-                        onChange.accept(
-                            new VirtualContainerViewComponent.ChangeEvent(
-                                player,
-                                slotIndex,
-                                oldItems.get(slotIndex),
-                                newItems.get(slotIndex),
-                                snapshot,
-                                new VirtualContainerViewComponent.SnapshotHandleImpl(editableSlot.handleRef().get(), snapshot)
-                            )
-                        );
+                    }
+                    // Fire batch change callback
+                    if (onBatchChange != null) {
+                        onBatchChange.accept(batchEvent);
                     }
                 });
+
+                // Check if cancelled and revert if needed
+                if (batchEvent.isCancelled()) {
+                    // Revert inventory to original state
+                    for (final Map.Entry<Integer, ItemStack> entry : originalState.entrySet()) {
+                        topInventory.setItem(entry.getKey(), entry.getValue());
+                    }
+                    return;
+                }
                 snapshot.reconcile();
 
                 return;
@@ -646,7 +687,7 @@ public final class ViewManager {
 
                     return;
                 }
-                if (onChange == null) {
+                if (onChange == null && editableSlot.onBatchChange() == null) {
                     return;
                 }
                 final Map<Integer, ItemStack> beforeState = new HashMap<>();
@@ -656,7 +697,6 @@ public final class ViewManager {
                 }
                 final Map<Integer, ItemStack> afterState = InventoryUtils.predictTopInventoryChanges(event);
                 final InventorySnapshot snapshot = new InventorySnapshot(topInventory);
-
 
                 for (final Map.Entry<Integer, ItemStack> entry : afterState.entrySet()) {
                     final int slotIndex = entry.getKey();
@@ -668,6 +708,10 @@ public final class ViewManager {
                     }
                     snapshot.setItemSilently(slotIndex, newStack);
                 }
+                // Track cancellation
+                final AtomicBoolean cancelled = new AtomicBoolean(false);
+                final List<VirtualContainerViewComponent.ChangeEvent> changeEvents = new ArrayList<>();
+
                 // Wrap onChange callbacks in batch to coalesce state changes
                 playerSession.reconciler.batch(() -> {
                     for (final Map.Entry<Integer, ItemStack> entry : afterState.entrySet()) {
@@ -678,18 +722,49 @@ public final class ViewManager {
                         if (Objects.equals(beforeStack, newStack)) {
                             continue;
                         }
-                        onChange.accept(
-                            new VirtualContainerViewComponent.ChangeEvent(
+                        final var changeEvent = new VirtualContainerViewComponent.ChangeEvent(
+                            player,
+                            slotIndex,
+                            beforeStack,
+                            newStack,
+                            snapshot,
+                            new VirtualContainerViewComponent.SnapshotHandleImpl(editableSlot.handleRef().get(), snapshot)
+                        );
+                        changeEvents.add(changeEvent);
+                        
+                        if (onChange != null) {
+                            onChange.accept(changeEvent);
+                        }
+                        
+                        if (changeEvent.isCancelled()) {
+                            cancelled.set(true);
+                        }
+                    }
+                    
+                    if (!changeEvents.isEmpty()) {
+                        final Consumer<VirtualContainerViewComponent.BatchChangeEvent> onBatchChange = editableSlot.onBatchChange();
+                        
+                        if (onBatchChange != null) {
+                            final var batchEvent = new VirtualContainerViewComponent.BatchChangeEvent(
                                 player,
-                                slotIndex,
-                                beforeStack,
-                                newStack,
+                                changeEvents,
                                 snapshot,
                                 new VirtualContainerViewComponent.SnapshotHandleImpl(editableSlot.handleRef().get(), snapshot)
-                            )
-                        );
+                            );
+                            onBatchChange.accept(batchEvent);
+                            
+                            if (batchEvent.isCancelled()) {
+                                cancelled.set(true);
+                            }
+                        }
                     }
                 });
+                
+                if (cancelled.get()) {
+                    event.setCancelled(true);
+
+                    return;
+                }
                 snapshot.reconcile();
 
                 return;
@@ -776,6 +851,8 @@ public final class ViewManager {
             }
             final Map<Integer, ItemStack> newItems = event.getNewItems();
             final InventorySnapshot snapshot = new InventorySnapshot(topInventory);
+            final List<VirtualContainerViewComponent.ChangeEvent> changeEvents = new ArrayList<>();
+            final Map<Integer, VirtualContainerViewComponent.EditableSlot> affectedSlots = new HashMap<>();
 
             for (final int rawSlot : event.getRawSlots()) {
                 if (rawSlot >= topInventory.getSize()) {
@@ -783,37 +860,64 @@ public final class ViewManager {
                 }
                 final ViewRenderable renderable = session.session.renderer().renderables().get(rawSlot);
 
-                if (!(renderable instanceof VirtualContainerViewComponent.EditableSlot)) {
+                if (!(renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot)) {
                     continue;
                 }
                 final ItemStack newItem = newItems.get(rawSlot);
 
                 snapshot.setItemSilently(rawSlot, newItem);
-            }
-            // Wrap onChange callbacks in batch to coalesce state changes
-            session.reconciler.batch(() -> {
-                for (final int rawSlot : event.getRawSlots()) {
-                    if (rawSlot >= topInventory.getSize()) {
-                        continue;
-                    }
-                    final ViewRenderable renderable = session.session.renderer().renderables().get(rawSlot);
-
-                    if (!(renderable instanceof final VirtualContainerViewComponent.EditableSlot editableSlot) || editableSlot.onChange() == null) {
-                        continue;
-                    }
-                    final ItemStack newItem = newItems.get(rawSlot);
-                    final var changeEvent = new VirtualContainerViewComponent.ChangeEvent(
+                affectedSlots.put(rawSlot, editableSlot);
+                changeEvents.add(
+                    new VirtualContainerViewComponent.ChangeEvent(
                         player,
                         rawSlot,
                         oldItems.get(rawSlot),
                         newItem,
                         snapshot,
                         new VirtualContainerViewComponent.SnapshotHandleImpl(editableSlot.handleRef().get(), snapshot)
-                    );
+                    )
+                );
+            }
 
-                    editableSlot.onChange().accept(changeEvent);
+            if (changeEvents.isEmpty()) {
+                return;
+            }
+
+            // Get the first slot's onBatchChange callback (all slots in same container should share it)
+            final VirtualContainerViewComponent.EditableSlot firstSlot = affectedSlots.values().iterator().next();
+            final Consumer<VirtualContainerViewComponent.BatchChangeEvent> onBatchChange = firstSlot.onBatchChange();
+
+            // Create batch event
+            final VirtualContainerViewComponent.BatchChangeEvent batchEvent =
+                new VirtualContainerViewComponent.BatchChangeEvent(
+                    player,
+                    changeEvents,
+                    snapshot,
+                    new VirtualContainerViewComponent.SnapshotHandleImpl(firstSlot.handleRef().get(), snapshot)
+                );
+
+            // Wrap onChange callbacks in batch to coalesce state changes
+            session.reconciler.batch(() -> {
+                for (final VirtualContainerViewComponent.ChangeEvent changeEvent : changeEvents) {
+                    final VirtualContainerViewComponent.EditableSlot editableSlot = affectedSlots.get(changeEvent.slot());
+                    final var onChange = editableSlot.onChange();
+
+                    if (onChange != null) {
+                        onChange.accept(changeEvent);
+                    }
+                }
+
+                // Fire batch change callback
+                if (onBatchChange != null) {
+                    onBatchChange.accept(batchEvent);
                 }
             });
+
+            if (batchEvent.isCancelled()) {
+                event.setCancelled(true);
+                return;
+            }
+
             snapshot.reconcile();
         }
 

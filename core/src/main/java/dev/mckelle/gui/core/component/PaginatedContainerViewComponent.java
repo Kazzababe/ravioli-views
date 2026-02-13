@@ -682,7 +682,7 @@ public class PaginatedContainerViewComponent<V, T, CC extends IClickContext<V>, 
             final int y = pos[1];
             final T value = data.get(i);
             
-            if (this.useSuspendedRenderables) {
+            if (this.useSuspendedRenderables || this.renderExecutor != null) {
                 context.set(
                     x,
                     y,

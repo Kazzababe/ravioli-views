@@ -35,7 +35,7 @@ public final class PaperHooks {
      * @param priority the priority level at which the event is handled in relation to other handlers; must not be null
      */
     public static <T extends Event> void useEvent(
-        @NotNull final RenderContext<Player> context,
+        @NotNull final RenderContext<?> context,
         @NotNull final Class<T> eventClass,
         @NotNull final Consumer<T> eventHandler,
         @NotNull final EventPriority priority
@@ -54,7 +54,7 @@ public final class PaperHooks {
      * @param eventHandler the handler logic to be invoked when the specified event is triggered; must not be null
      */
     public static <T extends Event> void useEvent(
-        @NotNull final RenderContext<Player> context,
+        @NotNull final RenderContext<?> context,
         @NotNull final Class<T> eventClass,
         @NotNull final Consumer<T> eventHandler
     ) {
@@ -74,7 +74,7 @@ public final class PaperHooks {
      * @param ignoreCancelled whether to ignore events that have been cancelled; true to ignore, false otherwise
      */
     public static <T extends Event> void useEvent(
-        @NotNull final RenderContext<Player> context,
+        @NotNull final RenderContext<?> context,
         @NotNull final Class<T> eventClass,
         @NotNull final Consumer<T> eventHandler,
         @NotNull final EventPriority priority,
@@ -95,7 +95,7 @@ public final class PaperHooks {
      * @param eventHandler the handler logic to be invoked when the specified event is triggered; must not be null
      */
     public static <T extends PlayerEvent> void usePlayerEvent(
-        @NotNull final RenderContext<Player> context,
+        @NotNull final RenderContext<?> context,
         @NotNull final Class<T> eventClass,
         @NotNull final Consumer<T> eventHandler
     ) {
@@ -115,7 +115,7 @@ public final class PaperHooks {
      * @param priority the priority level at which the event is handled in relation to other handlers; must not be null
      */
     public static <T extends PlayerEvent> void usePlayerEvent(
-        @NotNull final RenderContext<Player> context,
+        @NotNull final RenderContext<?> context,
         @NotNull final Class<T> eventClass,
         @NotNull final Consumer<T> eventHandler,
         @NotNull final EventPriority priority
@@ -137,13 +137,13 @@ public final class PaperHooks {
      * @param ignoreCancelled whether to ignore events that have been cancelled; true to ignore, false otherwise
      */
     public static <T extends PlayerEvent> void usePlayerEvent(
-        @NotNull final RenderContext<Player> context,
+        @NotNull final RenderContext<?> context,
         @NotNull final Class<T> eventClass,
         @NotNull final Consumer<T> eventHandler,
         @NotNull final EventPriority priority,
         final boolean ignoreCancelled
     ) {
-        final Player viewer = context.getProps();
+        final Player viewer = context.getViewer();
 
         useFilteredEvent(
             context,
@@ -174,7 +174,7 @@ public final class PaperHooks {
      * @param filter a predicate to determine whether an event should trigger the handler; null if no filtering is required
      */
     private static <T extends Event> void useFilteredEvent(
-        @NotNull final RenderContext<Player> context,
+        @NotNull final RenderContext<?> context,
         @NotNull final Class<T> eventClass,
         @NotNull final Consumer<T> eventHandler,
         @NotNull final EventPriority priority,

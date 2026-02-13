@@ -192,14 +192,16 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
     /**
      * A {@link ViewRenderable} that represents an empty, editable slot in a virtual container.
      *
-     * @param handleRef A reference to the container's {@link Handle}, used for creating {@link SnapshotHandle}s.
-     * @param filter    A predicate that determines which {@link ItemStack}s are allowed to be placed in this slot.
-     * @param onChange  A callback to be executed when the content of this slot changes.
+     * @param handleRef     A reference to the container's {@link Handle}, used for creating {@link SnapshotHandle}s.
+     * @param filter        A predicate that determines which {@link ItemStack}s are allowed to be placed in this slot.
+     * @param onChange      A callback to be executed when the content of this slot changes.
+     * @param onBatchChange A callback to be executed after all slot changes in a batch have been processed.
      */
     public record EditableSlot(
         @NotNull Ref<Handle> handleRef,
         @NotNull Predicate<@NotNull ItemStack> filter,
-        @Nullable Consumer<ChangeEvent> onChange
+        @Nullable Consumer<ChangeEvent> onChange,
+        @Nullable Consumer<BatchChangeEvent> onBatchChange
     ) implements ViewRenderable {
     }
 
@@ -210,6 +212,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
     private final ItemStack[] initialItems;
     private Predicate<ItemStack> filter = Predicates.alwaysTrue();
     private Consumer<ChangeEvent> onChange = null;
+    private Consumer<BatchChangeEvent> onBatchChange = null;
 
     /**
      * Creates a new virtual container component.
@@ -237,7 +240,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
         this.backing = new ViewRenderable[width * height];
         this.initialItems = new ItemStack[width * height];
 
-        Arrays.fill(this.backing, new EditableSlot(this.handleRef, this.filter, this.onChange));
+        Arrays.fill(this.backing, new EditableSlot(this.handleRef, this.filter, this.onChange, this.onBatchChange));
     }
 
     /**
@@ -253,7 +256,30 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
             final ViewRenderable renderable = this.backing[i];
 
             if (renderable instanceof final EditableSlot editableSlot) {
-                this.backing[i] = new EditableSlot(this.handleRef, editableSlot.filter, this.onChange);
+                this.backing[i] = new EditableSlot(this.handleRef, editableSlot.filter, this.onChange, editableSlot.onBatchChange);
+            }
+        }
+        return this;
+    }
+
+    /**
+     * Sets a callback to be executed after all slot changes in a batch have been processed.
+     * <p>
+     * This is useful for operations like drag-and-drop that affect multiple slots at once,
+     * allowing you to respond to the complete set of changes rather than each individual change.
+     * </p>
+     *
+     * @param onBatchChange The callback to run, providing details about all changes in the batch.
+     * @return This component instance for method chaining.
+     */
+    public @NotNull VirtualContainerViewComponent onBatchChange(@NotNull final Consumer<BatchChangeEvent> onBatchChange) {
+        this.onBatchChange = onBatchChange;
+
+        for (int i = 0; i < this.backing.length; i++) {
+            final ViewRenderable renderable = this.backing[i];
+
+            if (renderable instanceof final EditableSlot editableSlot) {
+                this.backing[i] = new EditableSlot(this.handleRef, editableSlot.filter, editableSlot.onChange, this.onBatchChange);
             }
         }
         return this;
@@ -270,13 +296,14 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
             final ViewRenderable renderable = this.backing[i];
 
             if (renderable instanceof final EditableSlot editableSlot && editableSlot.filter.equals(this.filter)) {
-                this.backing[i] = new EditableSlot(this.handleRef, itemStackFilter, this.onChange);
+                this.backing[i] = new EditableSlot(this.handleRef, itemStackFilter, editableSlot.onChange, editableSlot.onBatchChange);
             }
         }
         this.filter = itemStackFilter;
 
         return this;
     }
+
 
     /**
      * Sets the initial items to be displayed in the container using a map of slot indices to items.
@@ -516,22 +543,117 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
 
     /**
      * Represents a change event within a VirtualContainer.
-     *
-     * @param player   The player who initiated the change.
-     * @param slot     The slot index within the container that was modified.
-     * @param oldItem  The ItemStack that was in the slot before the change.
-     * @param newItem  The ItemStack in the slot after the change.
-     * @param snapshot The inventory snapshot reflecting the predicted state after the change.
-     * @param handle   A {@link SnapshotHandle} for interacting with the snapshot using container-local coordinates.
      */
-    public record ChangeEvent(
-        @NotNull Player player,
-        int slot,
-        @Nullable ItemStack oldItem,
-        @Nullable ItemStack newItem,
-        @NotNull InventorySnapshot snapshot,
-        @NotNull SnapshotHandle handle
-    ) {
+    public static final class ChangeEvent {
+        private final Player player;
+        private final int slot;
+        private final ItemStack oldItem;
+        private final ItemStack newItem;
+        private final InventorySnapshot snapshot;
+        private final SnapshotHandle handle;
+        private boolean cancelled = false;
+
+        /**
+         * Creates a new ChangeEvent.
+         *
+         * @param player   The player who initiated the change.
+         * @param slot     The slot index within the container that was modified.
+         * @param oldItem  The ItemStack that was in the slot before the change.
+         * @param newItem  The ItemStack in the slot after the change.
+         * @param snapshot The inventory snapshot reflecting the predicted state after the change.
+         * @param handle   A {@link SnapshotHandle} for interacting with the snapshot using container-local coordinates.
+         */
+        public ChangeEvent(
+            @NotNull final Player player,
+            final int slot,
+            @Nullable final ItemStack oldItem,
+            @Nullable final ItemStack newItem,
+            @NotNull final InventorySnapshot snapshot,
+            @NotNull final SnapshotHandle handle
+        ) {
+            this.player = player;
+            this.slot = slot;
+            this.oldItem = oldItem;
+            this.newItem = newItem;
+            this.snapshot = snapshot;
+            this.handle = handle;
+        }
+
+        /**
+         * Returns the player who initiated the change.
+         *
+         * @return The player.
+         */
+        public @NotNull Player player() {
+            return this.player;
+        }
+
+        /**
+         * Returns the slot index within the container that was modified.
+         *
+         * @return The slot index.
+         */
+        public int slot() {
+            return this.slot;
+        }
+
+        /**
+         * Returns the ItemStack that was in the slot before the change.
+         *
+         * @return The old item, or {@code null} if the slot was empty.
+         */
+        public @Nullable ItemStack oldItem() {
+            return this.oldItem;
+        }
+
+        /**
+         * Returns the ItemStack in the slot after the change.
+         *
+         * @return The new item, or {@code null} if the slot is now empty.
+         */
+        public @Nullable ItemStack newItem() {
+            return this.newItem;
+        }
+
+        /**
+         * Returns the inventory snapshot reflecting the predicted state after the change.
+         *
+         * @return The inventory snapshot.
+         */
+        public @NotNull InventorySnapshot snapshot() {
+            return this.snapshot;
+        }
+
+        /**
+         * Returns the {@link SnapshotHandle} for interacting with the snapshot using container-local coordinates.
+         *
+         * @return The snapshot handle.
+         */
+        public @NotNull SnapshotHandle handle() {
+            return this.handle;
+        }
+
+        /**
+         * Cancels this change, reverting the slot to its previous state.
+         * <p>
+         * <b>Note:</b> When this event is part of a batch (e.g., during a drag operation or shift-click
+         * that affects multiple slots), calling this method has no effect. Use {@link BatchChangeEvent#cancel()}
+         * instead to cancel the entire batch of changes.
+         * </p>
+         */
+        public void cancel() {
+            this.cancelled = true;
+        }
+
+        /**
+         * Returns whether this change has been cancelled.
+         *
+         * @return {@code true} if cancelled; {@code false} otherwise.
+         */
+        public boolean isCancelled() {
+            return this.cancelled;
+        }
+
         /**
          * Creates a {@link SnapshotHandle} for another container using this event's snapshot.
          * <p>
@@ -575,6 +697,124 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
             return new SnapshotHandleImpl(handle, this.snapshot);
         }
     }
+
+    /**
+     * Represents a batch of change events within a VirtualContainer that occurred as part of a single action.
+     * <p>
+     * This event is fired after all individual {@link ChangeEvent}s have been processed, providing
+     * a complete view of all changes that occurred (e.g., from a drag operation or shift-click).
+     * </p>
+     */
+    public static final class BatchChangeEvent {
+        private final Player player;
+        private final List<ChangeEvent> changes;
+        private final InventorySnapshot snapshot;
+        private final SnapshotHandle handle;
+        private boolean cancelled = false;
+
+        /**
+         * Creates a new BatchChangeEvent.
+         *
+         * @param player   The player who initiated the changes.
+         * @param changes  The list of individual change events in this batch.
+         * @param snapshot The inventory snapshot reflecting the predicted state after all changes.
+         * @param handle   A {@link SnapshotHandle} for interacting with the snapshot using container-local coordinates.
+         */
+        public BatchChangeEvent(
+            @NotNull final Player player,
+            @NotNull final List<ChangeEvent> changes,
+            @NotNull final InventorySnapshot snapshot,
+            @NotNull final SnapshotHandle handle
+        ) {
+            this.player = player;
+            this.changes = Collections.unmodifiableList(changes);
+            this.snapshot = snapshot;
+            this.handle = handle;
+        }
+
+        /**
+         * Returns the player who initiated the changes.
+         *
+         * @return The player.
+         */
+        public @NotNull Player player() {
+            return this.player;
+        }
+
+        /**
+         * Returns an unmodifiable list of all individual change events in this batch.
+         *
+         * @return The list of change events.
+         */
+        public @NotNull List<ChangeEvent> changes() {
+            return this.changes;
+        }
+
+        /**
+         * Returns the inventory snapshot reflecting the predicted state after all changes.
+         *
+         * @return The inventory snapshot.
+         */
+        public @NotNull InventorySnapshot snapshot() {
+            return this.snapshot;
+        }
+
+        /**
+         * Returns the {@link SnapshotHandle} for interacting with the snapshot using container-local coordinates.
+         *
+         * @return The snapshot handle.
+         */
+        public @NotNull SnapshotHandle handle() {
+            return this.handle;
+        }
+
+        /**
+         * Creates a {@link SnapshotHandle} for another container using this event's snapshot.
+         * <p>
+         * This allows you to read the predicted state of other containers during a batch callback,
+         * ensuring consistency across all containers in the view.
+         * </p>
+         *
+         * @param handleRef A reference to another container's {@link Handle}.
+         * @return A {@link SnapshotHandle} for the specified container, or {@code null} if the handle ref is empty.
+         */
+        public @Nullable SnapshotHandle createSnapshotHandle(@NotNull final Ref<Handle> handleRef) {
+            if (handleRef.isEmpty()) {
+                return null;
+            }
+            return new SnapshotHandleImpl(handleRef.get(), this.snapshot);
+        }
+
+        /**
+         * Creates a {@link SnapshotHandle} for another container using this event's snapshot.
+         * <p>
+         * This is a convenience overload that accepts a {@link Handle} directly instead of a {@link Ref}.
+         * </p>
+         *
+         * @param handle Another container's {@link Handle}.
+         * @return A {@link SnapshotHandle} for the specified container.
+         */
+        public @NotNull SnapshotHandle createSnapshotHandle(@NotNull final Handle handle) {
+            return new SnapshotHandleImpl(handle, this.snapshot);
+        }
+
+        /**
+         * Cancels all changes in this batch, reverting the inventory to its previous state.
+         */
+        public void cancel() {
+            this.cancelled = true;
+        }
+
+        /**
+         * Returns whether this batch of changes has been cancelled.
+         *
+         * @return {@code true} if cancelled; {@code false} otherwise.
+         */
+        public boolean isCancelled() {
+            return this.cancelled;
+        }
+    }
+
 
     /**
      * A handle for interacting with an {@link InventorySnapshot} using container-local coordinates.
@@ -728,6 +968,7 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
         private Ref<Handle> handleRef;
         private Predicate<ItemStack> filter = Predicates.alwaysTrue();
         private Consumer<ChangeEvent> onChange;
+        private Consumer<BatchChangeEvent> onBatchChange;
         private Map<Integer, ItemStack> initialItemsBySlot;
         private Function<Integer, ItemStack> initialItemSupplier;
         private String key;
@@ -789,6 +1030,18 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
         }
 
         /**
+         * Sets the batch change callback invoked after all slot changes in a batch have been processed.
+         *
+         * @param onBatchChange consumer invoked with details of all changes in the batch
+         * @return this builder
+         */
+        public @NotNull Builder onBatchChange(@NotNull final Consumer<BatchChangeEvent> onBatchChange) {
+            this.onBatchChange = onBatchChange;
+
+            return this;
+        }
+
+        /**
          * Sets initial items using a slot->item map.
          *
          * @param itemsBySlot map of local slot index to ItemStack
@@ -833,6 +1086,9 @@ public final class VirtualContainerViewComponent extends ViewComponent<Void> {
 
             if (this.onChange != null) {
                 component.onChange(this.onChange);
+            }
+            if (this.onBatchChange != null) {
+                component.onBatchChange(this.onBatchChange);
             }
             if (this.initialItemsBySlot != null) {
                 component.initialItems(this.initialItemsBySlot);

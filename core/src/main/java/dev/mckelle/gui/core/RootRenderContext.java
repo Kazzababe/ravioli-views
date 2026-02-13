@@ -154,6 +154,8 @@ public abstract class RootRenderContext<V, D, C extends IClickContext<V>> implem
             effectBucket.add(record);
         } else {
             record = effectBucket.get(this.effectCursor);
+
+            this.refCursor++;
         }
         this.effectCursor++;
 

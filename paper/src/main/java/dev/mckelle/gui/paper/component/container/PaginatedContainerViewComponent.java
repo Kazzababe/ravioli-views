@@ -218,7 +218,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
         private Executor loaderExecutor;
         private Executor renderExecutor;
         private RefreshBehavior refreshBehavior;
-        private boolean useSuspendedRenderables = false;
+        private boolean useSuspendedRenderables = true;
         private String key;
         private final Map<Character, List<SlotConfigurer<Player, ClickContext>>> componentMappings = new HashMap<>();
 
