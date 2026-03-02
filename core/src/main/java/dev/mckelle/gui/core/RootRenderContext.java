@@ -155,7 +155,7 @@ public abstract class RootRenderContext<V, D, C extends IClickContext<V>> implem
         } else {
             record = effectBucket.get(this.effectCursor);
 
-            this.refCursor++;
+            this.refCursor += 2;
         }
         this.effectCursor++;
 

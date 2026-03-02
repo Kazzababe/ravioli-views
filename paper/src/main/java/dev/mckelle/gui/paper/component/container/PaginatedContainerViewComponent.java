@@ -581,6 +581,7 @@ public final class PaginatedContainerViewComponent<T> extends dev.mckelle.gui.co
 
         private @NotNull Builder<T> map(final char ch, @NotNull final SlotConfigurer<Player, ClickContext> configurer) {
             this.componentMappings.computeIfAbsent(ch, k -> new java.util.ArrayList<>()).add(configurer);
+
             return this;
         }
 
